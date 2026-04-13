@@ -1,0 +1,10 @@
+.env
+data/
+logs/
+__pycache__/
+*.pyc
+.api.pid
+.scheduler.pid
+.DS_Store
+*.swp
+*.bak

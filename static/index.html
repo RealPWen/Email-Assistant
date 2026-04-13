@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DeepMail AI - 智能邮件审计系统</title>
+    <link rel="stylesheet" href="/static/css/styles.css?v=1.7">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body class="light-theme">
+    <div class="app-container">
+        <!-- Sidebar: Folders (Simplified) -->
+        <nav class="sidebar">
+            <div class="logo">
+                <i class="fas fa-envelope-open-text"></i>
+                <span>DeepMail</span>
+            </div>
+            <ul class="folder-list">
+                <li id="folder-inbox" class="active"><div class="folder-item"><i class="fas fa-inbox"></i> <span>收件箱</span></div></li>
+                <li id="folder-important"><div class="folder-item"><i class="fas fa-star"></i> <span>重要邮件</span></div></li>
+                <li id="folder-tasks"><div class="folder-item"><i class="fas fa-tasks"></i> <span>待办事项</span></div></li>
+                <li id="folder-archive" class="expandable">
+                    <div class="folder-header" id="archive-header">
+                        <i class="fas fa-archive"></i>
+                        <span>归档</span>
+                        <i class="fas fa-chevron-right toggle-icon"></i>
+                    </div>
+                    <ul class="sub-folder-list" id="category-list">
+                        <!-- Loaded dynamically via JS for a cleaner experience -->
+                    </ul>
+                </li>
+            </ul>
+            <div class="stats-card">
+                <!-- 同步进度条 (实时) -->
+                <div id="sync-progress-container" class="sync-progress" style="display: none;">
+                    <div class="sync-header">
+                        <span id="sync-status-text">正在初始化...</span>
+                        <span id="sync-percent">5%</span>
+                    </div>
+                    <div class="progress-track">
+                        <div id="sync-progress-bar" class="progress-fill" style="width: 5%"></div>
+                    </div>
+                    <div id="sync-detail-text" class="sync-detail">准备同步...</div>
+                </div>
+
+                <div class="stat-item">
+                    <span class="stat-label">存档总数</span>
+                    <span class="stat-value" id="stat-total">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">最早邮件</span>
+                    <span class="stat-value" id="stat-earliest">-</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">最近邮件</span>
+                    <span class="stat-value" id="stat-latest">-</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">最新同步</span>
+                    <span class="stat-value" id="stat-last-activity">-</span>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Middle Panel: Email List -->
+        <section class="email-list-panel">
+            <div class="panel-header">
+                <div class="filter-container">
+                    <select id="filter-importance" class="filter-select">
+                        <option value="all">全部邮件</option>
+                        <option value="high">重要邮件</option>
+                        <option value="low">普通邮件</option>
+                    </select>
+                </div>
+                <div class="actions">
+                    <button id="refresh-btn" title="刷新"><i class="fas fa-sync-alt"></i></button>
+                    <button id="sort-btn" title="排序"><i class="fas fa-sort-amount-down"></i></button>
+                </div>
+            </div>
+            <div class="search-bar">
+                <i class="fas fa-search"></i>
+                <input type="text" placeholder="搜索邮件...">
+            </div>
+            <div class="email-items" id="email-list">
+                <!-- Data will be injected here -->
+                <div class="loading">加载中...</div>
+            </div>
+        </section>
+
+        <!-- Main Panel: Email Content -->
+        <main class="content-panel" id="content-panel">
+            <div class="welcome-view" id="welcome-view">
+                <i class="fas fa-envelope"></i>
+                <h2>选择一封邮件开始阅览</h2>
+                <p>由 DeepSeek-R1 提供 AI 驱动的摘要与翻译</p>
+            </div>
+
+            <div class="detail-view hidden" id="detail-view">
+                <!-- Detail Header -->
+                <header class="detail-header">
+                    <div class="subject-line">
+                        <h1 id="detail-subject">邮件主题</h1>
+                        <div class="header-tags">
+                            <span class="tag category-tag" id="detail-category">分类</span>
+                            <span class="tag importance-tag" id="detail-importance">高</span>
+                        </div>
+                    </div>
+                    <div class="sender-info">
+                        <div class="avatar" id="detail-avatar">?</div>
+                        <div class="sender-meta">
+                            <strong id="detail-sender-name">发件人</strong>
+                            <span id="detail-date">日期</span>
+                        </div>
+                    </div>
+                    <div class="ai-summary-box">
+                        <div class="ai-header"><i class="fas fa-robot"></i> AI 摘要</div>
+                        <p id="detail-summary">AI 正在分析这封邮件...</p>
+                    </div>
+                </header>
+
+                <!-- Dual View Controls -->
+                <div class="view-controls">
+                    <button id="btn-split">并排对照</button>
+                    <button id="btn-original">仅原文</button>
+                    <button class="active" id="btn-translation">仅翻译</button>
+                </div>
+
+                <!-- Dual Body: Sync Scrolling -->
+                <div class="body-container only-translation" id="body-container">
+                    <div class="body-pane original-pane" id="pane-original">
+                        <div class="pane-label">原文 (Original)</div>
+                        <div class="raw-content" id="content-original"></div>
+                    </div>
+                    <div class="body-pane translation-pane" id="pane-translation">
+                        <div class="pane-label">翻译 (Translation)</div>
+                        <div class="raw-content" id="content-translation"></div>
+                    </div>
+                </div>
+
+                <!-- Action Items Footer -->
+                <footer class="detail-footer" id="action-items-footer">
+                    <div class="ai-header toggle-header" id="toggle-action-items">
+                        <span><i class="fas fa-clipboard-check"></i> 行动建议 (Action Items)</span>
+                        <i class="fas fa-chevron-down toggle-icon"></i>
+                    </div>
+                    <ul class="action-list collapsed" id="detail-action-items">
+                        <!-- Action items injected here -->
+                    </ul>
+                </footer>
+            </div>
+        </main>
+    </div>
+    <script src="/static/js/app.js?v=1.9"></script>
+</body>
+</html>
