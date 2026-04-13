@@ -329,4 +329,10 @@ def sync_emails(max_scan=500, batch_size=20, progress_callback=None):
         traceback.print_exc()
 
 if __name__ == "__main__":
-    sync_emails(max_scan=500, batch_size=20)
+    import argparse
+    parser = argparse.ArgumentParser(description="DeepMail Email Fetcher")
+    parser.add_argument("--max-scan", type=int, default=500, help="Maximum number of emails to scan")
+    parser.add_argument("--batch-size", type=int, default=20, help="Batch size for fetching RFC822 content")
+    
+    args = parser.parse_args()
+    sync_emails(max_scan=args.max_scan, batch_size=args.batch_size)

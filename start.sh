@@ -75,7 +75,17 @@ if [ $? -ne 0 ]; then
 fi
 echo -e "${GREEN}✅ 系统自检通过，准备启动服务...${NC}"
 
-# 3. 创建日志目录
+# 3. 初始同步与数据库检查
+if [ ! -f "data/emails.db" ]; then
+    echo -e "${YELLOW}📦 正在初始化数据库并进行首次同步 (请稍候)...${NC}"
+    python3 tools/fetch_emails.py --max-scan 50
+else
+    echo -e "${YELLOW}🔄 正在同步最新邮件...${NC}"
+    # 每次启动时仅快速扫描最近 20 封邮件以确保即时更新
+    python3 tools/fetch_emails.py --max-scan 20
+fi
+
+# 4. 创建日志目录
 mkdir -p logs
 
 # 4. 启动后端仪表盘 (FastAPI)
