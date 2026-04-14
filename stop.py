@@ -5,8 +5,9 @@ from pathlib import Path
 
 # --- Constants ---
 BASE_DIR = Path(__file__).resolve().parent
-API_PID_FILE = BASE_DIR / ".api.pid"
-SCHEDULER_PID_FILE = BASE_DIR / ".scheduler.pid"
+LOGS_DIR = BASE_DIR / "logs"
+API_PID_FILE = LOGS_DIR / ".api.pid"
+SCHEDULER_PID_FILE = LOGS_DIR / ".scheduler.pid"
 
 def print_header(text, color="red"):
     colors = {

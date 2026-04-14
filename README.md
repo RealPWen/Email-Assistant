@@ -3,7 +3,7 @@
 DeepMail AI 是一款专为高效工作者和学生（特别是 **香港大学 HKU** 用户）打造的智能化邮件管理系统。它结合了 **DeepSeek-V3/R1** 大模型的深度推理能力，将杂乱的收件箱转化为结构化的行动指南。
 
 > [!TIP]
-> **本项目现已全面支持 Windows 和 macOS 跨平台运行。**
+> **本项目现已全面支持 Windows 和 macOS 跨平台运行，并支持 163 邮箱新设备验证绕过。**
 
 ---
 
@@ -16,7 +16,7 @@ DeepMail AI 是一款专为高效工作者和学生（特别是 **香港大学 H
 
 ### 2. ⚡ 高性能同步 (High-Performance Sync)
 - **并行处理**：采用多线程并发技术，翻译与 AI 分析同时进行，同步速度提升 500%。
-- **增量扫描**：智能算法对比 `Message-ID`，仅同步新邮件，节省 API 消耗。
+- **增量扫描**：智能算法对比 `Message-ID`，并在登录前发送 `ID` 握手信息，确保在各平台（包括 Windows）稳定同步。
 - **数据标准化**：自动统一 RFC 2822 时间格式，让邮件在仪表盘中严格按时间线完美排序。
 
 ### 3. 🧠 Prompt 实验室 (Prompt Lab)
@@ -49,12 +49,15 @@ pip install -r requirements.txt
 ### 3. 启动系统
 
 #### 🖥️ Windows
-双击运行根目录下的 `start.bat`。
+双击运行根目录下的 `start.bat` 或者：
+```cmd
+python run.py
+```
 
 #### 🍎 macOS / Linux
+运行 `./start.sh` 或者：
 ```bash
-chmod +x start.sh
-./start.sh
+python3 run.py
 ```
 
 > [!NOTE]
@@ -63,11 +66,12 @@ chmod +x start.sh
 ---
 
 ## 📁 项目结构
+- `run.py`: 跨平台一键启动管理器（API + 调度器 + 浏览器唤起）。
+- `stop.py`: 一键停止所有后台服务。
+- `api_main.py`: 后端 FastAPI Web 服务。
 - `/core`: 系统核心逻辑，包括数据库管理、AI 技能模块。
-- `/tools`: 邮件抓取器、自动同步调度器。
-- `/static`: 现代化前端页面（HTML/CSS/JS）。
-- `api_main.py`: 后端 FastAPI 服务。
-- `run_service.py`: 跨平台启动管理器。
+- `/tools`: 邮件抓取器、同步调度器、系统自检工具。
+- `/static`: 现代化前端页面 (HTML/CSS/JS)。
 
 ---
 

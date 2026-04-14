@@ -9,4 +9,4 @@ then
     exit 1
 fi
 
-python3 run_service.py
+python3 run.py

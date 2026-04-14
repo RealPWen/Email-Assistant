@@ -10,8 +10,8 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent
 LOGS_DIR = BASE_DIR / "logs"
 ENV_FILE = BASE_DIR / ".env"
-API_PID_FILE = BASE_DIR / ".api.pid"
-SCHEDULER_PID_FILE = BASE_DIR / ".scheduler.pid"
+API_PID_FILE = LOGS_DIR / ".api.pid"
+SCHEDULER_PID_FILE = LOGS_DIR / ".scheduler.pid"
 
 def print_header(text, color="blue"):
     colors = {
@@ -73,7 +73,7 @@ DEEPSEEK_MODEL=deepseek-chat
 def run_self_check():
     print(f"\n🔍 正在进行系统核心功能自检...")
     # Use the same python executable to ensure environment consistency
-    res = subprocess.run([sys.executable, "verify_system.py"])
+    res = subprocess.run([sys.executable, "tools/verify_system.py"])
     if res.returncode != 0:
         print("\n❌ 系统自检未通过！请修正配置后重试。")
         sys.exit(1)
@@ -163,7 +163,7 @@ def main():
     print("-" * 40)
     print("✨ 全部服务已在后台启动！")
     print("🔗 访问地址: http://localhost:8000")
-    print("📝 停止服务请运行: python stop_service.py")
+    print("📝 停止服务请运行: python stop.py")
     print("=======================================")
 
 if __name__ == "__main__":

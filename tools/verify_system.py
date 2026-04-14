@@ -7,7 +7,7 @@ import time
 from dotenv import load_dotenv
 
 # 解决导入问题
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(BASE_DIR)
 
 from core.db_manager import DBManager
