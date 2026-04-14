@@ -5,8 +5,11 @@ import argparse
 from datetime import datetime
 
 # 解决导入问题
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.append(BASE_DIR)
+# 解决导入问题
+from pathlib import Path
+BASE_DIR = Path(__file__).resolve().parent.parent
+if str(BASE_DIR) not in sys.path:
+    sys.path.insert(0, str(BASE_DIR))
 
 from tools.fetch_emails import sync_emails
 
