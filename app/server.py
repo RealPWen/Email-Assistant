@@ -1,27 +1,24 @@
-from fastapi import FastAPI, HTTPException, Request, BackgroundTasks, StreamingResponse
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse
-from fastapi.middleware.cors import CORSMiddleware
-from core.db_manager import DBManager
-from core.todo_skill import TodoSkill
-from tools.fetch_emails import sync_emails
-import json
 import os
-import asyncio
-from queue import Queue
-from threading import Thread
-from fastapi.responses import JSONResponse
 import sys
 
 # 获取项目根目录，用于定位静态文件和数据库
-# __file__ is /Users/.../Email_dashboard/app/server.py
-# parent is Email_dashboard/app
-# parent.parent is Email_dashboard/
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # 确保项目根目录在 sys.path 中，以便导入 core 和 tools 模块
 if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
+
+from fastapi import FastAPI, HTTPException, Request, BackgroundTasks
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
+from core.db_manager import DBManager
+from core.todo_skill import TodoSkill
+from tools.fetch_emails import sync_emails
+import json
+import asyncio
+from queue import Queue
+from threading import Thread
 
 app = FastAPI(title="DeepMail AI API")
 
