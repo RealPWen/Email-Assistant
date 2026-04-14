@@ -6,6 +6,7 @@ from email.header import decode_header
 from email.utils import parsedate_to_datetime
 from deep_translator import GoogleTranslator
 from pathlib import Path
+import socket
 
 # --- Constants & Paths ---
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -22,6 +23,36 @@ if base_dir_str not in sys.path:
     sys.path.insert(0, base_dir_str)
 elif sys.path[1:2] == [base_dir_str]: # Handle edge cases
     pass
+
+
+
+def get_local_ip():
+    """获取本机在局域网中的 IP 地址，避开虚拟网卡和代理干扰。"""
+    try:
+        # 建立一个伪连接来探测出站接口 IP
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.settimeout(2)
+        # 使用 114 来探测（避开某些 VPN 拦截的 8.8.8.8）
+        s.connect(("114.114.114.114", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        
+        # 排除 198.18.x.x (常见于 Clash 等代理软件的虚拟网段)
+        if ip.startswith("198.18."):
+            import subprocess
+            # macOS 尝试直接获取 en0 (WiFi) 的地址
+            if sys.platform == "darwin":
+                res = subprocess.getoutput("ipconfig getifaddr en0")
+                if res and "." in res: return res
+            
+            # 通用备选方案：尝试获取 hostname 对应的所有 IP
+            ips = socket.gethostbyname_ex(socket.gethostname())[2]
+            for candidate in ips:
+                if not candidate.startswith("127.") and not candidate.startswith("198.18."):
+                    return candidate
+        return ip
+    except Exception:
+        return "127.0.0.1"
 
 
 def decode_str(s):

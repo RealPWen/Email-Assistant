@@ -7,7 +7,7 @@ import getpass
 from pathlib import Path
 
 from tools.utils import (
-    BASE_DIR, LOGS_DIR, ENV_FILE, API_PID_FILE, SCHEDULER_PID_FILE, print_header
+    BASE_DIR, LOGS_DIR, ENV_FILE, API_PID_FILE, SCHEDULER_PID_FILE, print_header, get_local_ip
 )
 
 def check_dependencies():
@@ -182,7 +182,12 @@ def main():
 
     print("-" * 40)
     print("✨ 全部服务已在后台启动！")
-    print("🔗 访问地址: http://localhost:8000")
+    
+    local_ip = get_local_ip()
+    print(f"🔗 本地访问: http://localhost:8000")
+    if local_ip != "127.0.0.1":
+        print(f"🌍 局域网访问: http://{local_ip}:8000 (同一 WiFi 下可用)")
+        
     print("📝 停止服务请运行: python stop.py")
     print("=======================================")
 
