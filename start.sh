@@ -19,6 +19,16 @@ if [ ! -f ".env" ]; then
     echo -e "${YELLOW}⚠️  未发现 .env 配置文件，正在引导您进行系统配置...${NC}"
     echo -e "${YELLOW}---------------------------------------${NC}"
     
+    echo -e "${YELLOW}💡 【前置准备：HKU (Outlook) 邮件转发配置】${NC}"
+    echo -e "${NC}如果您是香港大学的学生或教职工，为了突破系统限制正常拉取邮件，请先完成以下步骤：${NC}"
+    echo -e "${NC}   1. 在浏览器中打开：https://outlook.office365.com/mail/options/mail/forwarding${NC}"
+    echo -e "${NC}   2. 登录您的 HKU 账号。${NC}"
+    echo -e "${NC}   3. 勾选“启用转发 (Enable forwarding)”。${NC}"
+    echo -e "${NC}   4. 在下方输入您准备用于中转接收的网易 163 邮箱地址。${NC}"
+    echo -e "${NC}   5. 强烈建议您勾选“保留已转发邮件的副本 (Keep a copy of forwarded messages)”。${NC}"
+    echo -e "${NC}   6. 点击右下角的“保存”。${NC}"
+    echo -e "${YELLOW}---------------------------------------${NC}"
+    
     # 引导输入邮箱地址
     read -p "📧 请输入您的邮箱地址 (例如: user@163.com): " EMAIL_USER
     while [ -z "$EMAIL_USER" ]; do
@@ -27,13 +37,20 @@ if [ ! -f ".env" ]; then
     done
 
     # 引导输入邮箱授权码
+    echo -e "${YELLOW}💡 【如何获取 163 邮箱授权码？】${NC}"
+    echo -e "${NC}   1. 登录网页版 163 邮箱（mail.163.com）。${NC}"
+    echo -e "${NC}   2. 顶部菜单点击“设置”，选择“POP3/SMTP/IMAP”。${NC}"
+    echo -e "${NC}   3. 开启 IMAP/SMTP 服务（点击“开启”）。${NC}"
+    echo -e "${NC}   4. 找到并点击“新增授权码”，验证手机后将弹出的一串字符复制。${NC}"
+    echo -e "${YELLOW}---------------------------------------${NC}"
+    
     # 使用 -s 参数隐藏输入更安全
-    echo -n -e "🔑 请输入邮箱授权码/应用密码 (输入时不可见): "
+    echo -n -e "🔑 请输入提取到的邮箱授权码/应用密码 (输入时不可见): "
     read -s EMAIL_AUTH_CODE
     echo ""
     while [ -z "$EMAIL_AUTH_CODE" ]; do
         echo -e "${RED}❗ 授权码不能为空，请重新输入。${NC}"
-        echo -n -e "🔑 请输入邮箱授权码/应用密码: "
+        echo -n -e "🔑 请输入提取到的邮箱授权码/应用密码: "
         read -s EMAIL_AUTH_CODE
         echo ""
     done
