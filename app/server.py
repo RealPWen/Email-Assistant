@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Request, BackgroundTasks
+from fastapi import FastAPI, HTTPException, Request, BackgroundTasks, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -8,11 +8,29 @@ from tools.fetch_emails import sync_emails
 import json
 import os
 import asyncio
-from fastapi.responses import HTMLResponse, StreamingResponse
 from queue import Queue
 from threading import Thread
+from fastapi.responses import JSONResponse
+import sys
+
+# 获取项目根目录，用于定位静态文件和数据库
+# __file__ is /Users/.../Email_dashboard/app/server.py
+# parent is Email_dashboard/app
+# parent.parent is Email_dashboard/
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+# 确保项目根目录在 sys.path 中，以便导入 core 和 tools 模块
+if BASE_DIR not in sys.path:
+    sys.path.insert(0, BASE_DIR)
 
 app = FastAPI(title="DeepMail AI API")
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    return JSONResponse(
+        status_code=500,
+        content={"status": "error", "message": str(exc)},
+    )
 
 # 允许跨域
 app.add_middleware(
@@ -25,34 +43,34 @@ app.add_middleware(
 db = DBManager()
 
 # 挂载静态文件
-app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static")
+
+# (BASE_DIR 已在文件顶部定义)
+
+def serve_html(filename):
+    path = os.path.join(BASE_DIR, "static", filename)
+    with open(path, "r", encoding="utf-8") as f:
+        return f.read()
 
 @app.get("/", response_class=HTMLResponse)
 async def read_index():
-    with open("static/index.html", "r", encoding="utf-8") as f:
-        return f.read()
+    return serve_html("index.html")
 
 @app.get("/api/emails")
 async def get_emails(limit: int = 500):
     """获取邮件列表"""
-    try:
-        rows = db.get_all_emails(limit=limit)
-        emails = []
-        for row in rows:
-            emails.append({
-                "id": row['id'],
-                "message_id": row['message_id'],
-                "subject": row['subject'],
-                "sender": row['sender'],
-                "date": row['normalized_date'],
-                "importance": row['importance'],
-                "is_read": row['is_read'],
-                "summary": row['summary'],
-                "category": row['category']
-            })
-        return emails
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    rows = db.get_all_emails(limit=limit)
+    return [{
+        "id": row['id'],
+        "message_id": row['message_id'],
+        "subject": row['subject'],
+        "sender": row['sender'],
+        "date": row['normalized_date'],
+        "importance": row['importance'],
+        "is_read": row['is_read'],
+        "summary": row['summary'],
+        "category": row['category']
+    } for row in rows]
 
 @app.get("/api/email/{email_id}")
 async def get_email_detail(email_id: int):
@@ -88,16 +106,11 @@ async def mark_as_read(email_id: int, request: Request):
 @app.get("/api/stats")
 async def get_stats():
     """获取简单的仪表盘统计数据"""
-    try:
-        count = db.get_email_count()
-        # 这里可以扩展更多统计，如今日新增、未读数等
-        return {
-            "total_emails": count,
-            "unread_emails": 0, # 待实现
-            "important_emails": 0 # 待实现
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    return {
+        "total_emails": db.get_email_count(),
+        "unread_emails": db.get_unread_count(),
+        "important_emails": db.get_important_count()
+    }
 
 @app.get("/api/sync/progress")
 def sync_progress():
@@ -114,26 +127,34 @@ def sync_progress():
             "batch_size": 10,
             "progress_callback": callback
         })
+        thread.daemon = True # 确保主进程退出时子线程也退出
         thread.start()
         
         # 监听队列并将消息发送给前端
-        while thread.is_alive() or not q.empty():
+        # 增加一个终止条件，如果线程结束且队列为空，则退出循环
+        while True:
             try:
-                # 使用 timeout 避免永久阻塞，允许检查线程状态
+                # 使用 timeout 避免永久阻塞
                 msg = q.get(timeout=1.0)
                 yield f"data: {json.dumps(msg, ensure_ascii=False)}\n\n"
-            except:
+                
+                # 如果收到 done 消息，说明任务正常结束
+                if isinstance(msg, dict) and msg.get("status") == "done":
+                    break
+            except Exception:
+                # 检查线程是否还在运行，如果线程已挂且队列为空，则安全退出
+                if not thread.is_alive() and q.empty():
+                    # 补包一个 done 消息，防止前端一直等待
+                    final_msg = {"status": "done", "message": "同步任务结束"}
+                    yield f"data: {json.dumps(final_msg, ensure_ascii=False)}\n\n"
+                    break
                 continue
                 
-        # 确保发送最后的完成信号 (如果 sync_emails 异常退出)
-        # yield "data: {\"status\": \"done\", \"message\": \"同步结束\"}\n\n"
-
     return StreamingResponse(event_stream(), media_type="text/event-stream")
 
 @app.get("/todo", response_class=HTMLResponse)
 async def read_todo():
-    with open("static/todo.html", "r", encoding="utf-8") as f:
-        return f.read()
+    return serve_html("todo.html")
 
 def process_smart_todo(email_id: int, todo_id: int):
     """后台处理：从邮件中智能提取待办并更新占位符"""
@@ -188,10 +209,7 @@ async def add_smart_todo(email_id: int, background_tasks: BackgroundTasks):
 @app.get("/api/todos")
 async def get_todos():
     """获取所有待办事项"""
-    try:
-        return db.get_all_todos()
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    return db.get_all_todos()
 
 @app.post("/api/todos")
 async def create_todo(request: Request):
@@ -213,24 +231,13 @@ async def update_todo(todo_id: int, request: Request):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/api/todos/{todo_id}/status")
-async def update_todo_status(todo_id: int, request: Request):
-    """更新待办事项"""
-    try:
-        data = await request.json()
-        db.update_todo(todo_id, data)
-        return {"status": "success"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
 @app.delete("/api/todos/{todo_id}")
 async def delete_todo(todo_id: int):
     """删除待办事项"""
-    try:
-        db.delete_todo(todo_id)
-        return {"status": "success"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    db.delete_todo(todo_id)
+    return {"status": "success"}
+
+# Note: /api/todos/{todo_id}/status has been merged into PUT /api/todos/{todo_id}
 
 @app.post("/api/sync")
 def sync_now():
@@ -255,8 +262,7 @@ def sync_now():
 
 @app.get("/prompt-lab", response_class=HTMLResponse)
 async def read_prompt_lab():
-    with open("static/prompt_lab.html", "r", encoding="utf-8") as f:
-        return f.read()
+    return serve_html("prompt_lab.html")
 
 @app.get("/api/prompts")
 async def get_all_prompts():

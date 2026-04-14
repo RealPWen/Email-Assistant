@@ -210,8 +210,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     window.toggleTodo = async (id, currentStatus) => {
         try {
-            const res = await fetch(`/api/todos/${id}/status`, {
-                method: 'POST',
+            const res = await fetch(`/api/todos/${id}`, {
+                method: 'PUT',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({ status: currentStatus ? 0 : 1 })
             });
@@ -220,7 +220,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (todo) todo.status = currentStatus ? 0 : 1;
                 renderTasks();
                 renderCalendar();
-                showToast(currentStatus ? '已选为恢复待办' : '✅ 任务已完成！');
+                CommonUI.showToast(currentStatus ? '已重置为待办' : '✅ 任务已完成！');
             }
         } catch (err) {
             console.error('Update failed:', err);
@@ -299,23 +299,17 @@ document.addEventListener('DOMContentLoaded', () => {
     modalDom.closeBtn.addEventListener('click', closeEditModal);
     modalDom.saveBtn.addEventListener('click', handleSaveModal);
 
-    // --- Utils ---
+    // Use CommonUI for Toast and Date Formatting
+    function showToast(msg) { CommonUI.showToast(msg); }
+
     function formatTime(timestamp) {
         if (!timestamp) return '';
-        // SQLite 的 CURRENT_TIMESTAMP 是 UTC 时间，但格式为 "YYYY-MM-DD HH:MM:SS"
-        // JavaScript Date 解析这种格式默认会当作本地时间，因此需要补上 'Z' 使其被正确识别为 UTC
         let utcStr = timestamp;
         if (timestamp.includes(' ') && !timestamp.includes('Z')) {
             utcStr = timestamp.replace(' ', 'T') + 'Z';
         }
         const date = new Date(utcStr);
         return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    }
-
-    function showToast(msg) {
-        dom.toast.textContent = msg;
-        dom.toast.style.display = 'block';
-        setTimeout(() => { dom.toast.style.display = 'none'; }, 2000);
     }
 
     init();

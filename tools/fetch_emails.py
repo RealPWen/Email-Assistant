@@ -1,171 +1,72 @@
 import os
-import sys
 import imaplib
 import email
 import time
 import json
-from email.header import decode_header
-from email.utils import parsedate_to_datetime
-from dotenv import load_dotenv
-from deep_translator import GoogleTranslator
+import re
 import concurrent.futures
+import sys
 
-# 解决导入问题
+# 解决导入问题，确保能从根目录导入
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.append(BASE_DIR)
+if BASE_DIR not in sys.path:
+    sys.path.append(BASE_DIR)
+
+from tools.utils import (
+    decode_str, normalize_date, generate_composite_key,
+    smart_translate, chunk_list,
+)
+from dotenv import load_dotenv
+
+# 使用绝对路径定位 .env
+load_dotenv(os.path.join(BASE_DIR, ".env"))
 
 from core.db_manager import DBManager
 from core.email_summary_skill import EmailSummarySkill
 
-# 加载 .env 配置文件
-load_dotenv(os.path.join(BASE_DIR, ".env"))
 
 def get_text_from_msg(msg):
-    """从邮件对象中提取纯文本内容"""
+    """从邮件对象中提取纯文本内容。"""
     body = ""
     if msg.is_multipart():
         for part in msg.walk():
-            content_type = part.get_content_type()
-            content_disposition = str(part.get("Content-Disposition"))
-            if content_type == "text/plain" and "attachment" not in content_disposition:
+            if part.get_content_type() == "text/plain" and "attachment" not in str(part.get("Content-Disposition")):
                 payload = part.get_payload(decode=True)
                 if payload:
-                    charset = part.get_content_charset() or "utf-8"
-                    body += payload.decode(charset, "ignore")
+                    body += payload.decode(part.get_content_charset() or "utf-8", "ignore")
     else:
         payload = msg.get_payload(decode=True)
         if payload:
-            charset = msg.get_content_charset() or "utf-8"
-            body = payload.decode(charset, "ignore")
+            body = payload.decode(msg.get_content_charset() or "utf-8", "ignore")
     return body.strip()
 
+
 def get_attachments_metadata(msg):
-    """提取附件元数据（不下载内容）"""
+    """提取附件元数据（不下载内容）。"""
     attachments = []
     if msg.is_multipart():
         for part in msg.walk():
-            content_disposition = str(part.get("Content-Disposition"))
-            if "attachment" in content_disposition:
-                filename = decode_str(part.get_filename())
-                content_type = part.get_content_type()
-                # 估算大小 (base64 编码通常比原文件大 33% 左右，这里取解析后的字节数)
+            if "attachment" in str(part.get("Content-Disposition")):
                 payload = part.get_payload(decode=True)
-                size = len(payload) if payload else 0
-                
                 attachments.append({
-                    "name": filename or "unnamed",
-                    "size": size,
-                    "type": content_type
+                    "name": decode_str(part.get_filename()) or "unnamed",
+                    "size": len(payload) if payload else 0,
+                    "type": part.get_content_type()
                 })
     return attachments
 
-def decode_str(s):
-    """解码邮件头字段"""
-    if not s:
-        return ""
-    try:
-        decoded_parts = decode_header(s)
-        result = ""
-        for part, encoding in decoded_parts:
-            if isinstance(part, bytes):
-                result += part.decode(encoding if encoding else "utf-8", "ignore")
-            else:
-                result += part
-        return result
-    except:
-        return str(s)
-
-def normalize_date(date_str):
-    """将邮件日期转换为标准 ISO 格式"""
-    if not date_str:
-        return None
-    try:
-        dt = parsedate_to_datetime(date_str)
-        return dt.isoformat()
-    except Exception:
-        return None
-
-def smart_translate(text, target='zh-CN', chunk_limit=4500):
-    """
-    智能翻译：支持长文本分段翻译，按段落截断。
-    """
-    if not text or not text.strip():
-        return ""
-    
-    try:
-        translator = GoogleTranslator(source='auto', target=target)
-        
-        # 如果文本较短，直接翻译
-        if len(text) <= chunk_limit:
-            return translator.translate(text)
-        
-        # 长文本处理：按段落切割
-        paragraphs = text.split('\n')
-        chunks = []
-        current_chunk = ""
-        
-        for p in paragraphs:
-            # 如果单段就超过了限制（极少见），强制按字符切分
-            if len(p) > chunk_limit:
-                if current_chunk:
-                    chunks.append(current_chunk.strip())
-                    current_chunk = ""
-                # 强制切分长段落
-                for i in range(0, len(p), chunk_limit):
-                    chunks.append(p[i:i+chunk_limit])
-                continue
-
-            if len(current_chunk) + len(p) + 1 <= chunk_limit:
-                current_chunk += p + "\n"
-            else:
-                chunks.append(current_chunk.strip())
-                current_chunk = p + "\n"
-        
-        if current_chunk:
-            chunks.append(current_chunk.strip())
-            
-        # 分块翻译并合并
-        translated_chunks = []
-        for i, chunk in enumerate(chunks):
-            if chunk.strip():
-                translated_chunks.append(translator.translate(chunk))
-        
-        return "\n".join(translated_chunks)
-    except Exception as e:
-        print(f"⚠️ 翻译失败: {e}")
-        return ""
 
 def parse_flags(flags_bytes):
-    """解析 IMAP FLAGS，返回是否为已读 (1/0)"""
-    flags_str = str(flags_bytes).upper()
-    return 1 if "\\SEEN" in flags_str else 0
+    return 1 if "\\SEEN" in str(flags_bytes).upper() else 0
 
-def generate_composite_key(subject, date_str):
-    """根据主题和日期生成稳定的唯一标识码"""
-    # 规范化日期
-    norm_date = normalize_date(date_str) or "unknown_date"
-    # 解码并规范化主题 (去除两端空格，并限制长度防止过长)
-    norm_subject = decode_str(subject).strip()
-    return f"{norm_date}_{norm_subject}"
-
-def chunk_list(lst, n):
-    """将列表切分为大小为 n 的块"""
-    for i in range(0, len(lst), n):
-        yield lst[i:i + n]
 
 def sync_emails(max_scan=500, batch_size=50, progress_callback=None):
-    """
-    高度优化的邮件同步：支持批量抓取、元数据提取和状态同步。
-    :param progress_callback: 回调函数，接收 dict 格式的进度信息
-    """
+    """高度优化的邮件同步：支持批量抓取、元数据提取和状态同步。"""
+
     def report(status, message, progress=0, details=None):
+        info = {"status": status, "message": message, "progress": progress, "details": details or {}}
         if progress_callback:
-            progress_callback({
-                "status": status,
-                "message": message,
-                "progress": progress,
-                "details": details or {}
-            })
+            progress_callback(info)
         print(f"[{status}] {message}")
 
     report("start", "正在初始化同步任务...", 5)
@@ -182,187 +83,149 @@ def sync_emails(max_scan=500, batch_size=50, progress_callback=None):
         print(f"📡 正在连接 {imap_server}...")
         mail = imaplib.IMAP4_SSL(imap_server)
         mail.login(email_user, email_pass)
-        mail.xatom('ID', '("name" "fetch_script" "version" "1.1.0")')
-        mail.select("INBOX")
+        try:
+            mail.xatom('ID', '("name" "fetch_script" "version" "1.1.0")')
+        except Exception as e:
+            print(f"⚠️ IMAP ID 指令不受支持或失败: {e}")
 
+        mail.select("INBOX")
         status, messages = mail.search(None, "ALL")
         mail_ids = messages[0].split()
         total_found = len(mail_ids)
-        
+
         report("scanning", f"连接成功。正在扫描服务器 (共 {total_found} 封)...", 10)
-        
-        # 确定扫描范围 (从最后往前扫描)
-        scan_ids = mail_ids[max(0, total_found - max_scan):total_found]
-        scan_ids.reverse() # 最新的在前
-        
+
+        scan_ids = mail_ids[max(0, total_found - max_scan):]
+        scan_ids.reverse()
+
         ids_to_fetch_full = []
         status_updated_count = 0
-        
-        # --- 第一阶段：增量扫描 & 状态同步 (批量执行) ---
-        # 每次取 50 个 ID 进行 Header 和 Flags 扫描
+
+        # 第一阶段：增量扫描 & 状态同步
         for chunk in chunk_list(scan_ids, 50):
             id_range = ",".join([id.decode() for id in chunk])
             res, data = mail.fetch(id_range, "(FLAGS RFC822.SIZE BODY.PEEK[HEADER.FIELDS (MESSAGE-ID SUBJECT DATE)])")
-            
-            # 解析返回的数据 (imaplib 返回的是一个列表，偶数项通常是元组数据)
+
             for i in range(0, len(data), 2):
-                if not isinstance(data[i], tuple): continue
-                
+                if not isinstance(data[i], tuple):
+                    continue
                 header_data = data[i][1]
                 meta_str = data[i][0].decode()
-                
-                # 提取 FLAGS 和 ID
                 is_read = parse_flags(meta_str)
-                m_id = chunk[i//2].decode() # 对应当前的 ID
-                
-                # 解析 Header
+
+                try:
+                    m_id_match = re.search(r'^(\d+)', meta_str)
+                    m_id = m_id_match.group(1) if m_id_match else chunk[i // 2].decode()
+                except Exception:
+                    m_id = chunk[i // 2].decode()
+
                 headers = email.message_from_bytes(header_data)
-                
-                # 使用“时间 + 主题”生成唯一的同步 ID
                 sync_id = generate_composite_key(headers.get("Subject"), headers.get("Date"))
-                
+
                 if db.exists(sync_id):
-                    # 已存在，检查并更新已读状态
                     db.update_email_status(sync_id, is_read)
                     status_updated_count += 1
                 else:
-                    # 调试：输出为什么认为它是新邮件
                     report("debug", f"发现新邮件 ID: [{sync_id}]")
                     ids_to_fetch_full.append((m_id, sync_id, is_read))
 
         total_to_sync = len(ids_to_fetch_full)
-        report("scanned", f"扫描完成。发现 {total_to_sync} 封新邮件，{status_updated_count} 封邮件已更新状态。", 20)
-        
+        report("scanned", f"扫描完成。发现 {total_to_sync} 封新邮件，{status_updated_count} 封已更新状态。", 20)
+
         if total_to_sync == 0:
             report("done", "没有发现新邮件。", 100)
-            mail.close()
-            mail.logout()
+            mail.close(); mail.logout()
             return
 
         report("fetching", f"正在抓取新邮件内容 (共 {total_to_sync} 封)...", 25)
-        
-        # --- 第二阶段：正式同步 (批量 Fetch RFC822) ---
+
+        # 第二阶段：批量 Fetch + 并行 AI 分析
         new_count = 0
-        start_sync_time = time.time()
-        
-        def process_single_email_ai_task(email_data):
+
+        def process_single_email(email_data):
             subject = email_data["subject"]
             body = email_data["body"]
-            
-            # --- 新增：自动翻译 ---
-            print(f"   📝 [并行] 正在翻译: {subject[:20]}...")
-            body_translation = smart_translate(body)
-            email_data["body_translation"] = body_translation
-            
-            # --- 新增：AI 智能分析 (摘要、行动项、重要性) ---
-            print(f"   🤖 [并行] AI 正在分析: {subject[:20]}...")
+            print(f"   📝 [并行] 翻译+分析: {subject[:20]}...")
+            email_data["body_translation"] = smart_translate(body)
             try:
-                ai_skill = EmailSummarySkill() 
-                ai_result = ai_skill.analyze_email(body)
+                ai_result = EmailSummarySkill().analyze_email(body)
             except Exception as e:
                 print(f"   ⚠️ AI 分析失败: {e}")
                 ai_result = {}
-                
             email_data["summary"] = ai_result.get("summary", "")
             email_data["action_items"] = json.dumps(ai_result.get("action_items", []), ensure_ascii=False)
             email_data["importance"] = ai_result.get("importance", "低")
             return email_data
-        
+
         for idx_batch, batch in enumerate(chunk_list(ids_to_fetch_full, batch_size), 1):
             batch_uids = ",".join([item[0] for item in batch])
             res, msg_data_list = mail.fetch(batch_uids, "(RFC822)")
-            
-            # 解析批量返回的内容
-            current_batch_count = 0
-            parsed_emails_for_batch = []
-            
+
+            parsed_emails = []
             for i in range(0, len(msg_data_list), 2):
-                if not isinstance(msg_data_list[i], tuple): continue
-                
-                msg_bytes = msg_data_list[i][1]
-                msg = email.message_from_bytes(msg_bytes)
-                
-                # 匹配对应的元数据 (按顺序匹配)
-                # 注意：IMAP fetch 返回的顺序可能与请求顺序一致，也可能按服务器 ID 排序
-                # 这里我们通过内容重新校对
+                if not isinstance(msg_data_list[i], tuple):
+                    continue
+                msg = email.message_from_bytes(msg_data_list[i][1])
                 subject = decode_str(msg.get("Subject"))
                 sender = decode_str(msg.get("From"))
                 date_str = msg.get("Date")
-                
-                # 重新计算同步 ID 以匹配第一阶段
-                sync_id = generate_composite_key(msg.get("Subject"), date_str)
-                
-                # 查找对应的 is_read (从 batch 中找)
-                target_is_read = 0
+
+                try:
+                    m_id_match = re.search(r'^(\d+)', msg_data_list[i][0].decode())
+                    current_m_id = m_id_match.group(1) if m_id_match else None
+                except Exception:
+                    current_m_id = None
+
+                # 匹配元数据
+                target_sync_id, target_is_read = None, 0
                 for b_item in batch:
-                    # b_item[1] 是第一阶段生成的 sync_id
-                    if b_item[1] == sync_id:
-                        target_is_read = b_item[2]
+                    if b_item[0] == current_m_id:
+                        target_sync_id, target_is_read = b_item[1], b_item[2]
                         break
-                
-                body = get_text_from_msg(msg)
-                attachments = get_attachments_metadata(msg)
-                normalized_dt = normalize_date(date_str)
-                
-                email_data = {
-                    "message_id": sync_id,
-                    "subject": subject,
-                    "sender": sender,
-                    "date_str": date_str,
-                    "normalized_date": normalized_dt,
-                    "body": body,
-                    "folder": "INBOX",
+                if not target_sync_id:
+                    computed = generate_composite_key(msg.get("Subject"), date_str)
+                    for b_item in batch:
+                        if b_item[1] == computed:
+                            target_sync_id, target_is_read = b_item[1], b_item[2]
+                            break
+                    if not target_sync_id:
+                        target_sync_id = computed
+
+                parsed_emails.append({
+                    "message_id": target_sync_id,
+                    "subject": subject, "sender": sender, "date_str": date_str,
+                    "normalized_date": normalize_date(date_str),
+                    "body": get_text_from_msg(msg), "folder": "INBOX",
                     "is_read": target_is_read,
-                    "attachments_metadata": json.dumps(attachments, ensure_ascii=False),
-                    # placeholders for AI results
-                    "body_translation": "",
-                    "summary": "",
-                    "action_items": "[]",
-                    "importance": "低"
-                }
-                parsed_emails_for_batch.append(email_data)
-                
-            # 执行并行 AI 分析
-            processed_emails = []
+                    "attachments_metadata": json.dumps(get_attachments_metadata(msg), ensure_ascii=False),
+                    "body_translation": "", "summary": "", "action_items": "[]", "importance": "低",
+                })
+
             with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
-                # 提交任务
-                results = executor.map(process_single_email_ai_task, parsed_emails_for_batch)
-                processed_emails = list(results)
-                
-            # 统一顺序写入数据库
-            for email_data in processed_emails:
-                if db.save_email(email_data):
+                processed = list(executor.map(process_single_email, parsed_emails))
+
+            for ed in processed:
+                if db.save_email(ed):
                     new_count += 1
-                    current_batch_count += 1
-            
-            # 打印进度
-            processed = min(idx_batch * batch_size, total_to_sync)
-            current_progress = 25 + int((processed / total_to_sync) * 70) # 25% - 95%
-            
-            # 由于可能一次处理多个，取最后一个的 subject 作为参考
-            last_subject = processed_emails[-1]["subject"] if processed_emails else "未知"
-            report("analyzing", f"AI 正在分析邮件批量 ({processed}/{total_to_sync})...", current_progress, {
-                "current": processed,
-                "total": total_to_sync,
-                "last_subject": last_subject
-            })
 
+            done_count = min(idx_batch * batch_size, total_to_sync)
+            progress = 25 + int((done_count / total_to_sync) * 70)
+            last_subj = processed[-1]["subject"] if processed else "未知"
+            report("analyzing", f"AI 正在分析邮件批量 ({done_count}/{total_to_sync})...", progress,
+                   {"current": done_count, "total": total_to_sync, "last_subject": last_subj})
 
-        mail.close()
-        mail.logout()
-        
+        mail.close(); mail.logout()
         report("done", f"同步完成！新增 {new_count} 封邮件。", 100, {"new_count": new_count})
 
     except Exception as e:
         print(f"❌ 发生错误: {e}")
-        import traceback
-        traceback.print_exc()
+        import traceback; traceback.print_exc()
+
 
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="DeepMail Email Fetcher")
-    parser.add_argument("--max-scan", type=int, default=500, help="Maximum number of emails to scan")
-    parser.add_argument("--batch-size", type=int, default=50, help="Batch size for fetching RFC822 content")
-    
+    parser.add_argument("--max-scan", type=int, default=500)
+    parser.add_argument("--batch-size", type=int, default=50)
     args = parser.parse_args()
     sync_emails(max_scan=args.max_scan, batch_size=args.batch_size)

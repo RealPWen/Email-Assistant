@@ -159,61 +159,7 @@ body {
     margin-right: 10px;
 }
 
-/* Color Mapping (Sync with badges) */
-.dot-course,
-.dot-bg-course {
-    background-color: #1976d2;
-}
-
-.dot-research,
-.dot-bg-research {
-    background-color: #00838F;
-}
-
-.dot-seminar,
-.dot-bg-seminar {
-    background-color: #7b1fa2;
-}
-
-.dot-financial,
-.dot-bg-financial {
-    background-color: #fbc02d;
-}
-
-.dot-career,
-.dot-bg-career {
-    background-color: #C2185B;
-}
-
-.dot-campus,
-.dot-bg-campus {
-    background-color: #5D4037;
-}
-
-.dot-notification,
-.dot-bg-notification {
-    background-color: #388e3c;
-}
-
-.dot-social,
-.dot-bg-social {
-    background-color: #f57c00;
-}
-
-.dot-external,
-.dot-bg-external {
-    background-color: #6A1B9A;
-}
-
-.dot-promotion,
-.dot-bg-promotion {
-    background-color: #616161;
-}
-
-.dot-other,
-.dot-bg-other {
-    background-color: #455a64;
-}
+/* Category dots and badges moved to common.css */
 
 
 
@@ -459,79 +405,7 @@ body {
     margin-top: 10px;
 }
 
-/* Category Specific Badges in List */
-.badge {
-    padding: 2px 6px;
-    border-radius: 4px;
-    font-size: 0.7rem;
-    font-weight: bold;
-    margin-right: 5px;
-}
-
-.badge-course {
-    background-color: #e3f2fd;
-    color: #1976d2;
-}
-
-/* 蓝色 - 课程 */
-.badge-seminar {
-    background-color: #f3e5f5;
-    color: #7b1fa2;
-}
-
-/* 紫色 - 讲座 */
-.badge-financial {
-    background-color: #fff9c4;
-    color: #fbc02d;
-}
-
-/* 黄色 - 财务 */
-.badge-notification {
-    background-color: #e8f5e9;
-    color: #388e3c;
-}
-
-/* 绿色 - 系统 */
-.badge-social {
-    background-color: #ffe0b2;
-    color: #f57c00;
-}
-
-/* 橙色 - 社交 */
-.badge-promotion {
-    background-color: #f5f5f5;
-    color: #616161;
-}
-
-/* 灰色 - 推广 */
-.badge-research {
-    background-color: #E0F7FA;
-    color: #00838F;
-}
-
-/* 青色 - 研究 */
-.badge-career {
-    background-color: #FCE4EC;
-    color: #C2185B;
-}
-
-/* 粉色 - 职业 */
-.badge-campus {
-    background-color: #EFEBE9;
-    color: #5D4037;
-}
-
-/* 棕色 - 校内 */
-.badge-external {
-    background-color: #F3E5F5;
-    color: #6A1B9A;
-}
-
-/* 深紫 - 校企 */
-.badge-other {
-    background-color: #eceff1;
-    color: #455a64;
-}
+/* Badges moved to common.css */
 
 /* 蓝灰色 - 其他 */
 
@@ -679,9 +553,7 @@ body {
     flex: 1;
 }
 
-.hidden {
-    display: none !important;
-}
+/* Utility classes moved to common.css */
 
 /* --- Footer --- */
 .stats-card {

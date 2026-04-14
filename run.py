@@ -7,26 +7,9 @@ import getpass
 from pathlib import Path
 
 # --- Constants ---
-BASE_DIR = Path(__file__).resolve().parent
-LOGS_DIR = BASE_DIR / "logs"
-ENV_FILE = BASE_DIR / ".env"
-API_PID_FILE = LOGS_DIR / ".api.pid"
-SCHEDULER_PID_FILE = LOGS_DIR / ".scheduler.pid"
-
-def print_header(text, color="blue"):
-    colors = {
-        "green": "\033[0;32m",
-        "blue": "\033[0;34m",
-        "yellow": "\033[1;33m",
-        "red": "\033[0;31m",
-        "nc": "\033[0m"
-    }
-    # Windows command prompt doesn't always support ANSI, but it's okay for modern terminals
-    c = colors.get(color, colors["nc"])
-    nc = colors["nc"]
-    print(f"{c}======================================={nc}")
-    print(f"{c}    {text}    {nc}")
-    print(f"{c}======================================={nc}")
+from tools.utils import (
+    BASE_DIR, LOGS_DIR, ENV_FILE, API_PID_FILE, SCHEDULER_PID_FILE, print_header
+)
 
 def setup_env():
     if ENV_FILE.exists():
@@ -148,7 +131,7 @@ def main():
     
     # 启动后端
     print("\n📂 正在启动 Dashboard 后端...")
-    api_pid = start_background_process("api_main.py", LOGS_DIR / "api.log", API_PID_FILE)
+    api_pid = start_background_process("app/server.py", LOGS_DIR / "api.log", API_PID_FILE)
     print(f"✅ 后端已启动 (PID: {api_pid})")
 
     # 启动调度器

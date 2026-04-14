@@ -3,24 +3,7 @@ import sys
 import signal
 from pathlib import Path
 
-# --- Constants ---
-BASE_DIR = Path(__file__).resolve().parent
-LOGS_DIR = BASE_DIR / "logs"
-API_PID_FILE = LOGS_DIR / ".api.pid"
-SCHEDULER_PID_FILE = LOGS_DIR / ".scheduler.pid"
-
-def print_header(text, color="red"):
-    colors = {
-        "green": "\033[0;32m",
-        "yellow": "\033[1;33m",
-        "red": "\033[0;31m",
-        "nc": "\033[0m"
-    }
-    c = colors.get(color, colors["nc"])
-    nc = colors["nc"]
-    print(f"{c}======================================={nc}")
-    print(f"{c}    {text}    {nc}")
-    print(f"{c}======================================={nc}")
+from tools.utils import API_PID_FILE, SCHEDULER_PID_FILE, print_header
 
 def kill_process(pid_file, name):
     if not pid_file.exists():

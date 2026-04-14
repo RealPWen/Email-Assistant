@@ -10,6 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let emailCache = new Map(); // Caching email details
     let isSyncingScroll = false;
     let currentFilter = 'all'; // 'all' or 'high'
+    let searchQuery = '';
 
     // --- DOM Cache for Detail View ---
     const dom = {
@@ -72,6 +73,15 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
         
+        // 2. Filter by Search Query
+        if (searchQuery) {
+            filtered = filtered.filter(e => 
+                (e.subject || '').toLowerCase().includes(searchQuery) ||
+                (e.sender || '').toLowerCase().includes(searchQuery) ||
+                (e.summary || '').toLowerCase().includes(searchQuery)
+            );
+        }
+        
         renderEmailList(filtered);
     }
 
@@ -87,7 +97,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="item-content">
                     <div class="item-top">
                         <span class="item-sender">${(email.sender || '').split('<')[0].trim()}</span>
-                        <span class="item-date">${formatDate(email.date)}</span>
+                        <span class="item-date">${CommonUI.formatDate(email.date)}</span>
                     </div>
                     <div class="item-subject">
                         <span class="badge ${getCategoryClass(email.category)}">${email.category || '其他'}</span>
@@ -193,15 +203,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Helpers ---
-    function formatDate(dateStr) {
-        if (!dateStr) return '';
-        const date = new Date(dateStr);
-        const now = new Date();
-        if (date.toDateString() === now.toDateString()) {
-            return date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-        }
-        return date.toLocaleDateString([], {month: 'short', day: 'numeric'});
-    }
+    // Removed redundant formatDate (moved to common.js)
 
     function getCategoryClass(category) {
         const mapping = {
@@ -323,10 +325,20 @@ document.addEventListener('DOMContentLoaded', () => {
         return body;
     }
 
-    function updateStats(emails) {
+    async function updateStats(emails) {
+        // First, fetch the official counts from the backend
+        try {
+            const stats = await fetch('/api/stats').then(res => res.json());
+            document.getElementById('stat-total').textContent = stats.total_emails || 0;
+            // Unread and Important could be displayed too if we add UI elements for them
+        } catch (e) {
+            console.error('Failed to fetch official stats:', e);
+            if (emails) document.getElementById('stat-total').textContent = emails.length;
+        }
+
         if (!emails || emails.length === 0) return;
         
-        // Parse dates and filter out invalid ones
+        // Parse dates for Earliest/Latest (Frontend only knows about the latest 500)
         const dates = emails
             .map(e => e.date ? new Date(e.date) : null)
             .filter(d => d && !isNaN(d.getTime()))
@@ -334,8 +346,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (dates.length === 0) return;
 
-        const earliest = dates[0];
         const latest = dates[dates.length - 1];
+        const earliest = dates[0];
         
         const formatDateShort = (d) => {
             const year = d.getFullYear();
@@ -348,7 +360,6 @@ document.addEventListener('DOMContentLoaded', () => {
             return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         };
 
-        document.getElementById('stat-total').textContent = emails.length;
         document.getElementById('stat-earliest').textContent = formatDateShort(earliest);
         document.getElementById('stat-latest').textContent = formatDateShort(latest);
         document.getElementById('stat-last-activity').textContent = `${formatDateShort(latest)} ${timeFormat(latest)}`;
@@ -407,6 +418,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const filterSelect = document.getElementById('filter-importance');
     if (filterSelect) {
         filterSelect.addEventListener('change', applyFilters);
+    }
+
+    // --- Search Logic ---
+    const searchInput = document.querySelector('.search-bar input');
+    if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+            searchQuery = e.target.value.toLowerCase();
+            applyFilters();
+        });
     }
 
     setupSidebar();

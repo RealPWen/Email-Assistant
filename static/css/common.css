@@ -1,0 +1,56 @@
+/* DeepMail Common Styles & Design Tokens */
+
+:root {
+    --primary: #6366f1;
+    --primary-hover: #4f46e5;
+    --success: #10b981;
+    --danger: #ef4444;
+    --warning: #f59e0b;
+    --text-main: #0f172a;
+    --text-muted: #64748b;
+    --bg-glass: rgba(255, 255, 255, 0.75);
+    --border-glass: rgba(255, 255, 255, 0.4);
+    --shadow-premium: 0 20px 50px rgba(0, 0, 0, 0.05), 0 5px 15px rgba(0, 0, 0, 0.03);
+    --glass-blur: 16px;
+}
+
+/* Category Color System */
+.dot-course, .badge-course { background-color: #1976d2; color: white; }
+.dot-research, .badge-research { background-color: #00838F; color: white; }
+.dot-seminar, .badge-seminar { background-color: #7b1fa2; color: white; }
+.dot-financial, .badge-financial { background-color: #fbc02d; color: black; }
+.dot-career, .badge-career { background-color: #C2185B; color: white; }
+.dot-campus, .badge-campus { background-color: #5D4037; color: white; }
+.dot-notification, .badge-notification { background-color: #388e3c; color: white; }
+.dot-social, .badge-social { background-color: #f57c00; color: white; }
+.dot-external, .badge-external { background-color: #6A1B9A; color: white; }
+.dot-promotion, .badge-promotion { background-color: #616161; color: white; }
+.dot-other, .badge-other { background-color: #455a64; color: white; }
+
+/* Global Utilities */
+.hidden { display: none !important; }
+
+/* Shimmer Loading */
+.loading-shimmer {
+    background: linear-gradient(90deg, #f0f0f0 25%, #f7f7f7 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+}
+
+/* Common Components */
+.btn-icon-text {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
