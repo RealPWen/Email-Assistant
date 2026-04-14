@@ -98,8 +98,8 @@ if [ ! -f "data/emails.db" ]; then
     python3 tools/fetch_emails.py --max-scan 50
 else
     echo -e "${YELLOW}🔄 正在同步最新邮件...${NC}"
-    # 每次启动时仅快速扫描最近 20 封邮件以确保即时更新
-    python3 tools/fetch_emails.py --max-scan 20
+    # 每次启动时仅快速扫描最近 50 封邮件以确保即时更新
+    python3 tools/fetch_emails.py --max-scan 50
 fi
 
 # 4. 创建日志目录

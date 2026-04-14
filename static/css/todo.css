@@ -91,6 +91,7 @@ body.todo-theme {
     flex: 1.6;
     display: flex;
     flex-direction: column;
+    min-height: 0; /* Crucial for nested flexbox scrolling */
 }
 
 .section-header {
@@ -173,6 +174,7 @@ body.todo-theme {
     flex: 1;
     overflow-y: auto;
     padding: 10px 40px 40px 40px;
+    min-height: 0; /* Crucial for nested flexbox scrolling */
 }
 
 .task-item {

@@ -153,7 +153,7 @@ def chunk_list(lst, n):
     for i in range(0, len(lst), n):
         yield lst[i:i + n]
 
-def sync_emails(max_scan=500, batch_size=20, progress_callback=None):
+def sync_emails(max_scan=500, batch_size=50, progress_callback=None):
     """
     高度优化的邮件同步：支持批量抓取、元数据提取和状态同步。
     :param progress_callback: 回调函数，接收 dict 格式的进度信息
@@ -362,7 +362,7 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="DeepMail Email Fetcher")
     parser.add_argument("--max-scan", type=int, default=500, help="Maximum number of emails to scan")
-    parser.add_argument("--batch-size", type=int, default=20, help="Batch size for fetching RFC822 content")
+    parser.add_argument("--batch-size", type=int, default=50, help="Batch size for fetching RFC822 content")
     
     args = parser.parse_args()
     sync_emails(max_scan=args.max_scan, batch_size=args.batch_size)
