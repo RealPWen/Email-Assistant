@@ -17,27 +17,28 @@ def run_scheduler(interval_minutes=10):
     """
     轻量级调度器：每隔指定时间自动同步一次邮件。
     """
-    print(f"🚀 DeepMail AI 自动同步服务已启动...")
-    print(f"⏰ 设定同步间隔: {interval_minutes} 分钟")
-    print(f"📅 开始时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    # Windows 控制台常为 GBK，直接打印 emoji 可能触发 UnicodeEncodeError
+    print(f"DeepMail AI 自动同步服务已启动...")
+    print(f"设定同步间隔: {interval_minutes} 分钟")
+    print(f"开始时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print("-" * 50)
 
     try:
         while True:
             current_time = datetime.now().strftime("%H:%M:%S")
-            print(f"\n🔄 [{current_time}] 正在检查新邮件...")
+            print(f"\n[{current_time}] 正在检查新邮件...")
             
             # 执行同步逻辑
             # 我们限制 max_scan 为 200，提高增量同步效率
             sync_emails(max_scan=200, batch_size=10)
             
-            print(f"😴 同步结束。等待 {interval_minutes} 分钟进行下一次检查...")
+            print(f"同步结束。等待 {interval_minutes} 分钟进行下一次检查...")
             time.sleep(interval_minutes * 60)
             
     except KeyboardInterrupt:
-        print(f"\n🛑 服务已停止。")
+        print(f"\n服务已停止。")
     except Exception as e:
-        print(f"⚠️ 调度器发生异常: {e}")
+        print(f"调度器发生异常: {e}")
         # 如果崩溃，等待 60 秒后重试
         time.sleep(60)
         run_scheduler(interval_minutes)
