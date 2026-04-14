@@ -2,8 +2,9 @@ import os
 import imaplib
 from dotenv import load_dotenv
 
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-load_dotenv(os.path.join(BASE_DIR, ".env"))
+from pathlib import Path
+BASE_DIR = Path(__file__).resolve().parent.parent
+load_dotenv(BASE_DIR / ".env")
 
 
 def get_mail_connection():

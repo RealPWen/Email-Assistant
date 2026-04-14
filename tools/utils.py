@@ -15,9 +15,13 @@ API_PID_FILE = LOGS_DIR / ".api.pid"
 SCHEDULER_PID_FILE = LOGS_DIR / ".scheduler.pid"
 ENV_FILE = BASE_DIR / ".env"
 
-# 统一处理 sys.path，确保项目根目录在搜索路径中
-if str(BASE_DIR) not in sys.path:
-    sys.path.insert(0, str(BASE_DIR))
+# 统一处理 sys.path，确保项目根目录在搜索路径的最前面
+# 这对于 Windows 上的多模块导入至关重要
+base_dir_str = str(BASE_DIR)
+if base_dir_str not in sys.path:
+    sys.path.insert(0, base_dir_str)
+elif sys.path[1:2] == [base_dir_str]: # Handle edge cases
+    pass
 
 
 def decode_str(s):

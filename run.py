@@ -6,10 +6,32 @@ import webbrowser
 import getpass
 from pathlib import Path
 
-# --- Constants ---
 from tools.utils import (
     BASE_DIR, LOGS_DIR, ENV_FILE, API_PID_FILE, SCHEDULER_PID_FILE, print_header
 )
+
+def check_dependencies():
+    """检查必要的库是否已安装。"""
+    required = ["fastapi", "uvicorn", "requests", "dotenv", "bs4", "deep_translator"]
+    missing = []
+    for lib in required:
+        try:
+            if lib == "dotenv":
+                import dotenv
+            elif lib == "bs4":
+                import bs4
+            else:
+                __import__(lib)
+        except ImportError:
+            missing.append(lib)
+    
+    if missing:
+        print_header("⚠️  缺少必要的运行环境", "red")
+        print(f"以下库未安装: {', '.join(missing)}")
+        print("\n请运行以下命令进行安装:")
+        print("pip install -r requirements.txt")
+        print("-" * 40)
+        sys.exit(1)
 
 def setup_env():
     if ENV_FILE.exists():
@@ -56,7 +78,13 @@ DEEPSEEK_MODEL=deepseek-chat
 def run_self_check():
     print(f"\n🔍 正在进行系统核心功能自检...")
     # Use the same python executable to ensure environment consistency
-    res = subprocess.run([sys.executable, "tools/verify_system.py"])
+    script_path = str(BASE_DIR / "tools" / "verify_system.py")
+    
+    # Pass current PYTHONPATH to ensure sub-scripts can find 'core' and 'tools'
+    env = os.environ.copy()
+    env["PYTHONPATH"] = str(BASE_DIR)
+    
+    res = subprocess.run([sys.executable, script_path], env=env)
     if res.returncode != 0:
         print("\n❌ 系统自检未通过！请修正配置后重试。")
         sys.exit(1)
@@ -99,7 +127,15 @@ def start_background_process(script_path, log_file, pid_file):
     else:
         popen_kwargs["creationflags"] = creation_flags
 
-    process = subprocess.Popen([sys.executable, "-u", script_path], **popen_kwargs)
+    # 正确处理脚本路径
+    full_script_path = str(BASE_DIR / script_path.replace("/", os.sep))
+    
+    # 注入 PYTHONPATH
+    env = os.environ.copy()
+    env["PYTHONPATH"] = str(BASE_DIR)
+    popen_kwargs["env"] = env
+
+    process = subprocess.Popen([sys.executable, "-u", full_script_path], **popen_kwargs)
     
     with open(pid_file, "w") as f:
         f.write(str(process.pid))
@@ -107,6 +143,7 @@ def start_background_process(script_path, log_file, pid_file):
     return process.pid
 
 def main():
+    check_dependencies()
     print_header("🚀 DeepMail AI 启动程序 (Cross-Platform)", "blue")
     
     while True:

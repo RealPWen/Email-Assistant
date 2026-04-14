@@ -7,8 +7,12 @@ import time
 from dotenv import load_dotenv
 
 # 解决导入问题
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.append(BASE_DIR)
+from pathlib import Path
+
+# 解决导入问题，确保项目根目录在搜索路径的最前面
+BASE_DIR = Path(__file__).resolve().parent.parent
+if str(BASE_DIR) not in sys.path:
+    sys.path.insert(0, str(BASE_DIR))
 
 from core.db_manager import DBManager
 from core.email_summary_skill import EmailSummarySkill

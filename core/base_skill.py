@@ -6,8 +6,9 @@ from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 
 # 项目根目录 & 环境变量（只加载一次）
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-load_dotenv(os.path.join(BASE_DIR, ".env"))
+from pathlib import Path
+BASE_DIR = Path(__file__).resolve().parent.parent
+load_dotenv(BASE_DIR / ".env")
 
 class BaseSkill:
     """所有 AI 技能的基类，封装公共初始化和 API 调用逻辑。"""

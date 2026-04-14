@@ -8,9 +8,11 @@ import concurrent.futures
 import sys
 
 # 解决导入问题，确保能从根目录导入
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if BASE_DIR not in sys.path:
-    sys.path.append(BASE_DIR)
+# 解决导入问题，确保能从根目录导入
+from pathlib import Path
+BASE_DIR = Path(__file__).resolve().parent.parent
+if str(BASE_DIR) not in sys.path:
+    sys.path.insert(0, str(BASE_DIR))
 
 from tools.utils import (
     decode_str, normalize_date, generate_composite_key,
