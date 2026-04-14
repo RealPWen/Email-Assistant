@@ -7,12 +7,20 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 load_dotenv(os.path.join(BASE_DIR, ".env"))
 
 def get_mail_connection():
-    """获取 IMAP 连接"""
+    """获取 IMAP 连接，并针对 163 等邮箱发送 ID 识别信息"""
     email_user = os.getenv("EMAIL_USER")
     email_pass = os.getenv("EMAIL_AUTH_CODE")
     imap_server = "imap.163.com"
     
     mail = imaplib.IMAP4_SSL(imap_server)
+    
+    # 【核心修复】：对于 163 等邮箱，开启 IMAP 后验证新设备必须先发送 ID 信息
+    # 否则即使授权码正确，服务器也会返回 "LOGIN Login error or password error"
+    try:
+        mail.xatom('ID', '("name" "DeepMailAI" "version" "1.2.0")')
+    except Exception as e:
+        print(f"⚠️ 发送 ID 握手信息失败（可能非 163 邮箱）: {e}")
+        
     mail.login(email_user, email_pass)
     return mail
 

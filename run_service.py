@@ -126,8 +126,24 @@ def start_background_process(script_path, log_file, pid_file):
 def main():
     print_header("🚀 DeepMail AI 启动程序 (Cross-Platform)", "blue")
     
-    setup_env()
-    run_self_check()
+    while True:
+        setup_env()
+        try:
+            run_self_check()
+            # 如果自检通过，跳出配置循环
+            break
+        except SystemExit:
+            print("\n" + "!" * 40)
+            print("⚠️ 系统探测到配置信息（邮箱或授权码）可能不正确。")
+            choice = input("是否要【重新输入】配置信息？(y/n): ").lower()
+            if choice == 'y':
+                if ENV_FILE.exists():
+                    ENV_FILE.unlink() # 删除旧文件以触发重新配置
+                continue
+            else:
+                print("❌ 程序退出。请手动检查 .env 文件。")
+                sys.exit(1)
+    
     run_initial_sync()
     
     # 启动后端
