@@ -106,42 +106,13 @@ class EmailSummarySkill:
         if len(cleaned_text) > max_length:
             cleaned_text = cleaned_text[:max_length] + "... (内容已截断)"
         
-        system_prompt = (
-            "你是一个专业的邮件智能助理。请分析以下邮件内容，并严格以 JSON 格式返回结果。\n"
-            "【强制语言要求】：无论原始邮件使用何种语言，JSON 中的所有文本字段必须使用【简体中文】。 \n\n"
-            "【当前用户画像】：\n"
-            "- 用户姓名：潘闻 (PAN WEN)\n"
-            "- 身份：香港大学 (HKU) 研究生\n"
-            "- 专业：数据科学 (Data Science)\n"
-            "- 核心目标：自我提升、学业精进、拓宽行业及学术视野。\n\n"
-            "JSON 结构要求：\n"
-            "{\n"
-            "  \"summary\": \"一句话总结邮件核心内容\",\n"
-            "  \"action_items\": [\"行动项1\", \"行动项2\"], \n"
-            "  \"importance\": \"高/低\",\n"
-            "  \"category\": \"课程内容/学术研究/讲座与学术/财务/职业发展/校内事务/系统通知/社交与活动/校企与外部/推广/其他\",\n"
-            "  \"reason\": \"判定重要性和分类的原因\"\n"
-            "}\n\n"
-            "【分类判定标准】：\n"
-            "1. 课程内容 (Course)：包含课程编号（如 COMP, DASC, MATH）、Moodle 提醒、作业、考试、成绩发布等。\n"
-            "2. 学术研究 (Research)：研究参与者招募、实验室通知、项目调研。 \n"
-            "3. 讲座与学术 (Seminar)：研讨会、讲座预约、学术期刊、图书馆资源、实验室新闻。\n"
-            "4. 财务 (Financial)：学费、缴费单、银行转账、薪资单、消费凭证、数字货币结单、金融指标报告 (如 VIX/SKEW)。\n"
-            "5. 职业发展 (Career)：实习、校招、职业辅导 (CEDARS Career)、面试邀请、招聘讲座。\n"
-            "6. 校内事务 (Campus)：学生处 (CEDARS) 综合通知、校内设施调整、校园新闻、通识教育通知。\n"
-            "7. 系统通知 (Notification) ：验证码、重置密码、系统维护、服务安全提醒。\n"
-            "8. 社交与活动 (Social)：社团活动、聚会邀请、校友会快讯、学生会选举。\n"
-            "9. 校企与外部 (External)：合作伙伴通知、外部机构函件、校外活动推荐。\n"
-            "10. 推广 (Promotion)：不相关的商业广告、APP 推广、非学术 Newsletter。\n"
-            "11. 其他 (Other)：不属于以上任何类别的邮件。\n\n"
-            "【重要性判定标准】：\n"
-            "1. 重要 (高)：需满足以下任一条件：\n"
-            "   - 有明确截止日期 (Deadline)、成绩发布、账户安全安全警报。\n"
-            "   - 财务相关：银行结单 (Statement)、薪资单、缴费通知。\n"
-            "   - 【个性化高价值】：与数据科学 (Data Science) 学习/职业/研究直接相关的资讯；香港大学 (HKU) 的校务/奖学金/选课重要通知；能够显著拓宽视野、对个人成长有益的讲座、研讨会或高质量学术快讯。\n"
-            "2. 不重要 (低)：常规新闻速报、没有任何截止日期的普通社团简报、已失效的信息、纯商业推广广告、系统自动回复的 Acknowledgement。\n\n"
-            "【特别警告】：完全忽略 HTML 噪音。严禁输出任何非 JSON 的解释性文字。"
-        )
+        from core.db_manager import DBManager
+        db = DBManager()
+        system_prompt = db.get_prompt('email_summary')
+        
+        if not system_prompt: # Fallback just in case DB doesn't have it
+            from core.default_prompts import DEFAULT_PROMPTS
+            system_prompt = DEFAULT_PROMPTS['email_summary']
         
         user_prompt = f"{custom_instruction}\n\n待分析邮件正文：\n{cleaned_text}"
         

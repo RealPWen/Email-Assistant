@@ -42,23 +42,15 @@ class TodoSkill:
         if not current_time:
             current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        system_prompt = f"""你是一个高效的任务管理专家。请从提供的邮件内容中提取待办事项详情。
-【当前时间参考】：{current_time}
-
-请严格以 JSON 格式返回以下字段（使用简体中文）：
-{{
-  "title": "任务简洁标题",
-  "due_date": "识别到的截止日期，格式必须为 YYYY-MM-DD。若文中提到'明天'或'下周五'，请根据参考时间计算出具体日期。若无日期，请分析内容给出最合理的预估日期。",
-  "priority": "High / Normal / Low (根据重要性和紧急程度判定)",
-  "content": "具体要做什么的一句话摘要",
-  "details": "具体的执行步骤及'怎么样才算完成'的判断标准。"
-}}
-
-【提取规则】：
-- 如果是作业/考试，优先级设为 High。
-- 如果是报名/截止日期，due_date 为该日期前一天或当天。
-- 忽略广告和推广信息。如果没有发现实质性待办，请在 title 中说明'未发现明确待办'。 
-严禁输出任何非 JSON 的解释性文字。"""
+        from core.db_manager import DBManager
+        db = DBManager()
+        system_prompt_template = db.get_prompt('todo_extract')
+        
+        if not system_prompt_template: # Fallback just in case DB doesn't have it
+            from core.default_prompts import DEFAULT_PROMPTS
+            system_prompt_template = DEFAULT_PROMPTS['todo_extract']
+            
+        system_prompt = system_prompt_template.replace("{current_time}", current_time)
 
         headers = {
             "Authorization": f"Bearer {self.api_key}",

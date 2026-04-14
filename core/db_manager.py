@@ -69,6 +69,29 @@ class DBManager:
                 )
             ''')
             
+            # 4. 创建 prompt_templates 表
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS prompt_templates (
+                    skill_name TEXT PRIMARY KEY,
+                    system_prompt TEXT,
+                    default_system_prompt TEXT,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            # 插入默认 prompts
+            try:
+                from core.default_prompts import DEFAULT_PROMPTS
+                for skill_name, default_prompt in DEFAULT_PROMPTS.items():
+                    cursor.execute('SELECT 1 FROM prompt_templates WHERE skill_name = ?', (skill_name,))
+                    if not cursor.fetchone():
+                        cursor.execute('''
+                            INSERT INTO prompt_templates (skill_name, system_prompt, default_system_prompt)
+                            VALUES (?, ?, ?)
+                        ''', (skill_name, default_prompt, default_prompt))
+            except Exception as e:
+                print(f"⚠️ 初始化默认 Prompt 失败: {e}")
+            
             conn.commit()
 
     def get_connection(self):
@@ -260,3 +283,49 @@ class DBManager:
             cursor.execute(f"UPDATE todos SET {', '.join(updates)} WHERE id = ?", params)
             conn.commit()
 
+    # --- Prompt Management Methods ---
+
+    def get_prompt(self, skill_name, default_fallback=""):
+        """获取指定 skill 的当前 prompt"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('SELECT system_prompt FROM prompt_templates WHERE skill_name = ?', (skill_name,))
+            row = cursor.fetchone()
+            return row[0] if row else default_fallback
+
+    def get_all_prompts(self):
+        """获取所有 prompts 信息"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('SELECT skill_name, system_prompt, default_system_prompt, updated_at FROM prompt_templates')
+            return [dict(row) for row in cursor.fetchall()]
+
+    def update_prompt(self, skill_name, new_prompt):
+        """更新指定 skill 的 prompt"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            # 检查是否存在
+            cursor.execute('SELECT 1 FROM prompt_templates WHERE skill_name = ?', (skill_name,))
+            if cursor.fetchone():
+                cursor.execute('''
+                    UPDATE prompt_templates 
+                    SET system_prompt = ?, updated_at = CURRENT_TIMESTAMP 
+                    WHERE skill_name = ?
+                ''', (new_prompt, skill_name))
+            else:
+                cursor.execute('''
+                    INSERT INTO prompt_templates (skill_name, system_prompt, default_system_prompt)
+                    VALUES (?, ?, ?)
+                ''', (skill_name, new_prompt, new_prompt))
+            conn.commit()
+
+    def restore_default_prompt(self, skill_name):
+        """将指定 skill 的 prompt 恢复为默认值"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                UPDATE prompt_templates 
+                SET system_prompt = default_system_prompt, updated_at = CURRENT_TIMESTAMP 
+                WHERE skill_name = ? AND default_system_prompt IS NOT NULL
+            ''', (skill_name,))
+            conn.commit()

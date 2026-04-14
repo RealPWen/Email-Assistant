@@ -251,6 +251,66 @@ def sync_now():
         print(f"Sync error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+# --- Prompt Lab Endpoints ---
+
+@app.get("/prompt-lab", response_class=HTMLResponse)
+async def read_prompt_lab():
+    with open("static/prompt_lab.html", "r", encoding="utf-8") as f:
+        return f.read()
+
+@app.get("/api/prompts")
+async def get_all_prompts():
+    """获取所有提示词"""
+    try:
+        return db.get_all_prompts()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.put("/api/prompts/{skill_name}")
+async def update_prompt(skill_name: str, request: Request):
+    """保存更新的提示词"""
+    try:
+        data = await request.json()
+        new_prompt = data.get("system_prompt")
+        if not new_prompt:
+            raise HTTPException(status_code=400, detail="Missing system_prompt")
+        db.update_prompt(skill_name, new_prompt)
+        return {"status": "success"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/prompts/{skill_name}/restore")
+async def restore_prompt(skill_name: str):
+    """恢复默认提示词"""
+    try:
+        db.restore_default_prompt(skill_name)
+        return {"status": "success"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/prompts/{skill_name}/optimize")
+async def optimize_prompt(skill_name: str, request: Request):
+    """使用 Meta-Skill 流式改写 prompt"""
+    try:
+        data = await request.json()
+        user_request = data.get("user_request")
+        if not user_request:
+            raise HTTPException(status_code=400, detail="Missing user_request")
+            
+        current_prompt = db.get_prompt(skill_name)
+        if not current_prompt:
+            raise HTTPException(status_code=404, detail="Skill prompt not found")
+            
+        from core.prompt_meta_skill import PromptMetaSkill
+        meta_skill = PromptMetaSkill()
+        
+        return StreamingResponse(
+            meta_skill.optimize_prompt_stream(current_prompt, user_request), 
+            media_type="text/plain"
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
