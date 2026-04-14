@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DeepMail AI - 待办中心</title>
+    <!-- Modern Font: Outfit -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/todo.css?v=1.2">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body class="todo-theme">
+    <!-- Abstract Background Elements -->
+    <div class="blob"></div>
+    <div class="blob blob-2"></div>
+
+    <div class="todo-container">
+        <!-- Left: Task List Pane -->
+        <section class="glass-panel task-section">
+            <header class="section-header">
+                <div class="header-title-group">
+                    <a href="/" class="btn-back-pill"><i class="fas fa-arrow-left"></i> 返回邮件仪表盘</a>
+                    <h1>待办中心</h1>
+                </div>
+            </header>
+
+            <!-- Search and Filter Bar -->
+            <div class="task-list-controls">
+                <div class="search-box">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="task-search" placeholder="搜索任务标题或内容...">
+                </div>
+            </div>
+            
+            <div class="task-list" id="task-list">
+                <!-- Data will be injected here -->
+                <div class="empty-state">
+                    <i class="fas fa-tasks"></i>
+                    <h3>正在拼命加载...</h3>
+                    <p>AI 助手正在整理您的待办事项</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Right: Calendar Pane -->
+        <section class="calendar-section glass-panel">
+            <header class="calendar-control-bar">
+                <div class="current-month-label" id="calendar-month-year">2026年 四月</div>
+                <div class="calendar-nav-btns">
+                    <button id="prev-month" class="nav-btn"><i class="fas fa-chevron-left"></i></button>
+                    <button id="next-month" class="nav-btn"><i class="fas fa-chevron-right"></i></button>
+                </div>
+            </header>
+            
+            <div class="calendar-body">
+                <div class="weekdays-row">
+                    <span class="weekday">日</span>
+                    <span class="weekday">一</span>
+                    <span class="weekday">二</span>
+                    <span class="weekday">三</span>
+                    <span class="weekday">四</span>
+                    <span class="weekday">五</span>
+                    <span class="weekday">六</span>
+                </div>
+                <div class="days-grid" id="calendar-days">
+                    <!-- Days dynamically generated -->
+                </div>
+            </div>
+            
+            <div class="calendar-legend">
+                <div class="legend-title">图例说明</div>
+                <div class="legend-items">
+                    <div class="legend-pill"><div class="color-dot" style="background: var(--danger);"></div> 高优先级</div>
+                    <div class="legend-pill"><div class="color-dot" style="background: var(--primary);"></div> 普通任务</div>
+                    <div class="legend-pill"><div class="color-dot" style="background: var(--success);"></div> 低优先级</div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" style="position: fixed; bottom: 40px; left: 50%; transform: translateX(-50%); background: #1e293b; color: white; padding: 14px 28px; border-radius: 16px; display: none; z-index: 1000; box-shadow: 0 10px 30px rgba(0,0,0,0.2); font-weight: 600;">操作已完成</div>
+
+    <!-- Edit Todo Modal -->
+    <div id="todo-modal" class="modal-overlay hidden" style="z-index: 1500;">
+        <div class="modal-content glass-card">
+            <header class="modal-header">
+                <h2><i class="fas fa-edit"></i> 编辑待办事项</h2>
+                <button class="close-modal" id="modal-close">&times;</button>
+            </header>
+            <div class="modal-body">
+                <input type="hidden" id="modal-todo-id">
+                <div class="input-group">
+                    <label>任务标题</label>
+                    <input type="text" id="modal-todo-title" placeholder="要做什么？">
+                </div>
+                <div class="input-row">
+                    <div class="input-group">
+                        <label>截止日期</label>
+                        <input type="date" id="modal-todo-date">
+                    </div>
+                    <div class="input-group">
+                        <label>优先级</label>
+                        <select id="modal-todo-priority">
+                            <option value="High">🔥 高优先级</option>
+                            <option value="Normal">⚡ 普通</option>
+                            <option value="Low">🌱 低优先级</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="input-group">
+                    <label>执行详情与完成条标准</label>
+                    <textarea id="modal-todo-details" rows="4"></textarea>
+                </div>
+            </div>
+            <footer class="modal-footer">
+                <button id="modal-cancel" class="btn-secondary">取消</button>
+                <button id="modal-confirm" class="btn-primary">确认保存</button>
+            </footer>
+        </div>
+    </div>
+
+    <script src="/static/js/todo.js?v=1.2"></script>
+</body>
+</html>

@@ -1,8 +1,9 @@
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, BackgroundTasks
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from core.db_manager import DBManager
+from core.todo_skill import TodoSkill
 from tools.fetch_emails import sync_emails
 import json
 import os
@@ -128,6 +129,108 @@ def sync_progress():
         # yield "data: {\"status\": \"done\", \"message\": \"同步结束\"}\n\n"
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+@app.get("/todo", response_class=HTMLResponse)
+async def read_todo():
+    with open("static/todo.html", "r", encoding="utf-8") as f:
+        return f.read()
+
+def process_smart_todo(email_id: int, todo_id: int):
+    """后台处理：从邮件中智能提取待办并更新占位符"""
+    try:
+        email = db.get_email_by_id(email_id)
+        if not email:
+            return
+            
+        todo_skill = TodoSkill()
+        content_to_analyze = email.get('body') or email.get('summary')
+        
+        extracted_info = todo_skill.extract_todo_info(content_to_analyze)
+        
+        # 组装待办数据并更新占位符
+        from datetime import datetime
+        todo_data = {
+            "title": extracted_info.get("title", email.get("subject")),
+            "content": extracted_info.get("details", ""),
+            "priority": extracted_info.get("priority", "Normal"),
+            "due_date": extracted_info.get("due_date", datetime.now().strftime("%Y-%m-%d")),
+            "status": 0
+        }
+        db.update_todo(todo_id, todo_data)
+        print(f"✅ 邮件 {email_id} 的智能待办已更新 (后台任务)")
+    except Exception as e:
+        print(f"❌ 智能提取后台任务失败: {e}")
+        # 失败状态，将任务置为人工处理
+        db.update_todo(todo_id, {"title": f"⚠ AI 提取失败: {email.get('subject')}", "status": 0})
+
+@app.post("/api/email/{email_id}/add-smart-todo")
+async def add_smart_todo(email_id: int, background_tasks: BackgroundTasks):
+    """一键转为待办：理解后门异步处理"""
+    email = db.get_email_by_id(email_id)
+    if not email:
+        raise HTTPException(status_code=404, detail="Email not found")
+        
+    # 立即插入带有AI处理中标记（status=2）的占位待办事项
+    from datetime import datetime
+    placeholder_data = {
+        "email_id": email_id,
+        "title": f"AI 正在提取待办: {email.get('subject', '未知标题')}",
+        "content": "请稍候，DeepSeek 正在扫描邮件内容并提取截止日期...",
+        "priority": "Normal",
+        "due_date": datetime.now().strftime("%Y-%m-%d"),
+        "status": 2
+    }
+    todo_id = db.add_todo(placeholder_data)
+        
+    background_tasks.add_task(process_smart_todo, email_id, todo_id)
+    return {"status": "processing", "message": "已进入后台提取并保存", "todo_id": todo_id}
+
+@app.get("/api/todos")
+async def get_todos():
+    """获取所有待办事项"""
+    try:
+        return db.get_all_todos()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/todos")
+async def create_todo(request: Request):
+    """添加本地待办事项"""
+    try:
+        data = await request.json()
+        todo_id = db.add_todo(data)
+        return {"status": "success", "id": todo_id}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.put("/api/todos/{todo_id}")
+async def update_todo(todo_id: int, request: Request):
+    """更新待办事项信息"""
+    try:
+        data = await request.json()
+        db.update_todo(todo_id, data)
+        return {"status": "success"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/todos/{todo_id}/status")
+async def update_todo_status(todo_id: int, request: Request):
+    """更新待办事项"""
+    try:
+        data = await request.json()
+        db.update_todo(todo_id, data)
+        return {"status": "success"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/api/todos/{todo_id}")
+async def delete_todo(todo_id: int):
+    """删除待办事项"""
+    try:
+        db.delete_todo(todo_id)
+        return {"status": "success"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/sync")
 def sync_now():

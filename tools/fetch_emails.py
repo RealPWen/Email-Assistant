@@ -8,6 +8,7 @@ from email.header import decode_header
 from email.utils import parsedate_to_datetime
 from dotenv import load_dotenv
 from deep_translator import GoogleTranslator
+import concurrent.futures
 
 # 解决导入问题
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -244,12 +245,37 @@ def sync_emails(max_scan=500, batch_size=20, progress_callback=None):
         new_count = 0
         start_sync_time = time.time()
         
+        def process_single_email_ai_task(email_data):
+            subject = email_data["subject"]
+            body = email_data["body"]
+            
+            # --- 新增：自动翻译 ---
+            print(f"   📝 [并行] 正在翻译: {subject[:20]}...")
+            body_translation = smart_translate(body)
+            email_data["body_translation"] = body_translation
+            
+            # --- 新增：AI 智能分析 (摘要、行动项、重要性) ---
+            print(f"   🤖 [并行] AI 正在分析: {subject[:20]}...")
+            try:
+                ai_skill = EmailSummarySkill() 
+                ai_result = ai_skill.analyze_email(body)
+            except Exception as e:
+                print(f"   ⚠️ AI 分析失败: {e}")
+                ai_result = {}
+                
+            email_data["summary"] = ai_result.get("summary", "")
+            email_data["action_items"] = json.dumps(ai_result.get("action_items", []), ensure_ascii=False)
+            email_data["importance"] = ai_result.get("importance", "低")
+            return email_data
+        
         for idx_batch, batch in enumerate(chunk_list(ids_to_fetch_full, batch_size), 1):
             batch_uids = ",".join([item[0] for item in batch])
             res, msg_data_list = mail.fetch(batch_uids, "(RFC822)")
             
             # 解析批量返回的内容
             current_batch_count = 0
+            parsed_emails_for_batch = []
+            
             for i in range(0, len(msg_data_list), 2):
                 if not isinstance(msg_data_list[i], tuple): continue
                 
@@ -278,16 +304,6 @@ def sync_emails(max_scan=500, batch_size=20, progress_callback=None):
                 attachments = get_attachments_metadata(msg)
                 normalized_dt = normalize_date(date_str)
                 
-                # --- 新增：自动翻译 ---
-                print(f"   📝 正在翻译: {subject[:20]}...")
-                body_translation = smart_translate(body)
-                
-                # --- 新增：AI 智能分析 (摘要、行动项、重要性) ---
-                print(f"   🤖 AI 正在分析邮件...")
-                # 初始化 AI 分析工具
-                ai_skill = EmailSummarySkill() 
-                ai_result = ai_skill.analyze_email(body)
-                
                 email_data = {
                     "message_id": sync_id,
                     "subject": subject,
@@ -298,12 +314,23 @@ def sync_emails(max_scan=500, batch_size=20, progress_callback=None):
                     "folder": "INBOX",
                     "is_read": target_is_read,
                     "attachments_metadata": json.dumps(attachments, ensure_ascii=False),
-                    "body_translation": body_translation,
-                    "summary": ai_result.get("summary", ""),
-                    "action_items": json.dumps(ai_result.get("action_items", []), ensure_ascii=False),
-                    "importance": ai_result.get("importance", "低")
+                    # placeholders for AI results
+                    "body_translation": "",
+                    "summary": "",
+                    "action_items": "[]",
+                    "importance": "低"
                 }
+                parsed_emails_for_batch.append(email_data)
                 
+            # 执行并行 AI 分析
+            processed_emails = []
+            with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+                # 提交任务
+                results = executor.map(process_single_email_ai_task, parsed_emails_for_batch)
+                processed_emails = list(results)
+                
+            # 统一顺序写入数据库
+            for email_data in processed_emails:
                 if db.save_email(email_data):
                     new_count += 1
                     current_batch_count += 1
@@ -312,11 +339,14 @@ def sync_emails(max_scan=500, batch_size=20, progress_callback=None):
             processed = min(idx_batch * batch_size, total_to_sync)
             current_progress = 25 + int((processed / total_to_sync) * 70) # 25% - 95%
             
-            report("analyzing", f"AI 正在分析邮件 ({processed}/{total_to_sync})...", current_progress, {
+            # 由于可能一次处理多个，取最后一个的 subject 作为参考
+            last_subject = processed_emails[-1]["subject"] if processed_emails else "未知"
+            report("analyzing", f"AI 正在分析邮件批量 ({processed}/{total_to_sync})...", current_progress, {
                 "current": processed,
                 "total": total_to_sync,
-                "last_subject": subject
+                "last_subject": last_subject
             })
+
 
         mail.close()
         mail.logout()

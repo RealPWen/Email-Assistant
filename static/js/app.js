@@ -23,8 +23,11 @@ document.addEventListener('DOMContentLoaded', () => {
         original: document.getElementById('content-original'),
         translation: document.getElementById('content-translation'),
         actionsList: document.getElementById('detail-action-items'),
-        bodyContainer: document.getElementById('body-container')
+        bodyContainer: document.getElementById('body-container'),
+        addTodoBtn: document.getElementById('btn-add-todo')
     };
+
+    let currentEmailData = null; // Track full data of loaded email
 
     // --- Data Fetching ---
     async function fetchEmails() {
@@ -125,6 +128,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
             // Save to Cache
             emailCache.set(id, email);
+            currentEmailData = email;
             
             displayEmail(email);
             
@@ -483,6 +487,48 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     document.getElementById('refresh-btn').addEventListener('click', syncAndRefresh);
+
+    async function handleAddTodo() {
+        if (!currentEmailData) return;
+        
+        const btn = dom.addTodoBtn;
+        const icon = btn.querySelector('i');
+        
+        // Immediate Feedback
+        btn.disabled = true;
+        icon.className = 'fas fa-spinner fa-spin';
+        
+        try {
+            // Call Smart Extraction API (Background Task)
+            const response = await fetch(`/api/email/${currentEmailData.id}/add-smart-todo`, {
+                method: 'POST'
+            });
+            
+            if (response.ok) {
+                icon.className = 'fas fa-check-circle';
+                btn.classList.add('success');
+                setTimeout(() => {
+                    icon.className = 'fas fa-plus-circle';
+                    btn.classList.remove('success');
+                    btn.disabled = false;
+                }, 2000);
+            } else {
+                throw new Error("API returned failure");
+            }
+        } catch (error) {
+            console.error('Task Submission failed:', error);
+            icon.className = 'fas fa-times-circle';
+            setTimeout(() => {
+                icon.className = 'fas fa-plus-circle';
+                btn.disabled = false;
+            }, 2000);
+            alert('添加请求提交失败。');
+        }
+    }
+
+    if (dom.addTodoBtn) {
+        dom.addTodoBtn.addEventListener('click', handleAddTodo);
+    }
 
     const toggleHeader = document.getElementById('toggle-action-items');
     const actionItemsList = document.getElementById('detail-action-items');

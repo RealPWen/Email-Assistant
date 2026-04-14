@@ -20,7 +20,7 @@ class DBManager:
         with self.get_connection() as conn:
             cursor = conn.cursor()
             
-            # 1. 创建基础表
+            # 1. 创建基础邮件表
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS emails (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -53,6 +53,21 @@ class DBManager:
                 if col_name not in current_columns:
                     print(f"🔧 正在升级数据库: 添加列 {col_name}...")
                     cursor.execute(f"ALTER TABLE emails ADD COLUMN {col_name} {col_type}")
+
+            # 3. 创建待办事项表
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS todos (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    email_id INTEGER,
+                    title TEXT,
+                    content TEXT,
+                    priority TEXT DEFAULT 'Normal',
+                    due_date TEXT,
+                    status INTEGER DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (email_id) REFERENCES emails(id)
+                )
+            ''')
             
             conn.commit()
 
@@ -184,5 +199,64 @@ class DBManager:
             params.append(message_id)
             query = f"UPDATE emails SET {', '.join(updates)} WHERE message_id = ?"
             cursor.execute(query, params)
+            conn.commit()
+
+    # --- Todo Management Methods ---
+
+    def add_todo(self, todo_data):
+        """添加待办事项"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT INTO todos (email_id, title, content, priority, due_date, status)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ''', (
+                todo_data.get('email_id'),
+                todo_data.get('title'),
+                todo_data.get('content'),
+                todo_data.get('priority', 'Normal'),
+                todo_data.get('due_date'),
+                todo_data.get('status', 0)
+            ))
+            conn.commit()
+            return cursor.lastrowid
+
+    def get_all_todos(self):
+        """获取所有待办事项"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('SELECT * FROM todos ORDER BY status ASC, due_date ASC, id DESC')
+            return [dict(row) for row in cursor.fetchall()]
+
+    def update_todo_status(self, todo_id, status):
+        """更新待办事项状态 (0: 未完成, 1: 已完成)"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('UPDATE todos SET status = ? WHERE id = ?', (status, todo_id))
+            conn.commit()
+
+    def delete_todo(self, todo_id):
+        """删除待办事项"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('DELETE FROM todos WHERE id = ?', (todo_id,))
+            conn.commit()
+
+    def update_todo(self, todo_id, todo_data):
+        """更新待办事项详情"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            updates = []
+            params = []
+            for key in ['title', 'content', 'priority', 'due_date', 'status']:
+                if key in todo_data:
+                    updates.append(f"{key} = ?")
+                    params.append(todo_data[key])
+            
+            if not updates:
+                return
+            
+            params.append(todo_id)
+            cursor.execute(f"UPDATE todos SET {', '.join(updates)} WHERE id = ?", params)
             conn.commit()
 
