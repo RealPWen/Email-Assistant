@@ -10,20 +10,24 @@ DeepMail AI 是一款专为高效工作者和学生（特别是 **香港大学 H
 ## ✨ 核心特性
 
 ### 1. 🤖 AI 智能解析 (AI Insights)
+
 - **自动摘要**：通过 DeepSeek 模型自动提取长邮件的核心要点，为您节省 80% 的阅读时间。
 - **重要性评估**：智能识别学费单、成绩、会议提醒等关键信息，并自动打上“重要”标签。
 - **行动项提取 (Action Items)**：从正文中提取待办任务，支持一键保存至“待办中心”。
 
 ### 2. ⚡ 高性能同步 (High-Performance Sync)
+
 - **并行处理**：采用多线程并发技术，翻译与 AI 分析同时进行，同步速度提升 500%。
 - **增量扫描**：智能算法对比 `Message-ID`，并在登录前发送 `ID` 握手信息，确保在各平台（包括 Windows）稳定同步。
 - **数据标准化**：自动统一 RFC 2822 时间格式，让邮件在仪表盘中严格按时间线完美排序。
 
 ### 3. 🧠 Prompt 实验室 (Prompt Lab)
+
 - **动态指令定制**：内置编辑器，允许您实时修改 AI 分析邮件的指令（System Prompt）。
 - **Meta-Skill 改写**：集成了 AI 提示词工程师，您只需说出需求（如“让摘要更简洁”），它会自动为您流式重写代码级指令。
 
 ### 4. 📅 待办中心 (Todo Center)
+
 - **玻璃拟态设计**：极致美观的 UI，支持任务按优先级分色显示。
 - **智能日历**：自动识别邮件中的截止日期，并在日历中直观展示。
 
@@ -32,16 +36,18 @@ DeepMail AI 是一款专为高效工作者和学生（特别是 **香港大学 H
 ## 🛠️ 快速开始
 
 ### 1. 准备工作
+
 - **环境要求**：已安装 Python 3.9+。
 - **HKU 用户 (Outlook)**：
-    1. 访问 [Outlook 转发设置](https://outlook.office365.com/mail/options/mail/forwarding)。
-    2. 开启“启用转发”，将邮件转发至您的网易 163 邮箱。
+  1. 访问 [Outlook 转发设置](https://outlook.office365.com/mail/options/mail/forwarding)。
+  2. 开启“启用转发”，将邮件转发至您的网易 163 邮箱。
 - **网易 163 邮箱**：
-    1. 登录 [mail.163.com](https://mail.163.com)。
-    2. 在“设置” -> “POP3/SMTP/IMAP”中开启服务。
-    3. 点击“新增授权码”并记录该密码。
+  1. 登录 [mail.163.com](https://mail.163.com)。
+  2. 在“设置” -> “POP3/SMTP/IMAP”中开启服务。
+  3. 点击“新增授权码”并记录该密码。
 
 ### 2. 安装依赖
+
 ```bash
 pip install -r requirements.txt
 ```
@@ -49,13 +55,17 @@ pip install -r requirements.txt
 ### 3. 启动系统
 
 #### 🖥️ Windows
+
 双击运行根目录下的 `start.bat` 或者：
+
 ```cmd
 python run.py
 ```
 
 #### 🍎 macOS / Linux
+
 运行 `./start.sh` 或者：
+
 ```bash
 python3 run.py
 ```
@@ -66,6 +76,7 @@ python3 run.py
 ---
 
 ## 📁 项目结构
+
 - `run.py`: 跨平台一键启动管理器（API + 调度器 + 浏览器唤起）。
 - `stop.py`: 一键停止所有后台服务。
 - `api_main.py`: 后端 FastAPI Web 服务。
@@ -76,7 +87,5 @@ python3 run.py
 ---
 
 ## 📜 许可证
-本项目仅供研究和个人生产力提升使用，请遵循相关 API 使用协议。
 
----
-**由 Antigravity AI 精心打造**
+本项目仅供研究和个人生产力提升使用，请遵循相关 API 使用协议。
