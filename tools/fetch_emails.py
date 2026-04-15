@@ -147,16 +147,20 @@ def sync_emails(max_scan=500, batch_size=50, progress_callback=None):
         def process_single_email(email_data):
             subject = email_data["subject"]
             body = email_data["body"]
-            print(f"   📝 [并行] 翻译+分析: {subject[:20]}...")
-            email_data["body_translation"] = smart_translate(body)
+            print(f"   📝 [并行] AI 深度分析: {subject[:20]}...")
+            
+            # 💡 优化：不再使用额外的 Google 翻译，DeepSeek 能够直接理解原文并输出中文摘要。
+            # 这节省了一次网络往返时间。
             try:
                 ai_result = EmailSummarySkill().analyze_email(body)
             except Exception as e:
                 print(f"   ⚠️ AI 分析失败: {e}")
                 ai_result = {}
+                
             email_data["summary"] = ai_result.get("summary", "")
             email_data["action_items"] = json.dumps(ai_result.get("action_items", []), ensure_ascii=False)
             email_data["importance"] = ai_result.get("importance", "低")
+            email_data["category"] = ai_result.get("category", "其他")
             return email_data
 
         for idx_batch, batch in enumerate(chunk_list(ids_to_fetch_full, batch_size), 1):

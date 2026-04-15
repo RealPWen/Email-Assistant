@@ -76,6 +76,13 @@ class DBManager:
                 )
             ''')
 
+            # 索引优化：显著提升排序和侧边栏过滤速度
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_emails_date ON emails(normalized_date DESC)')
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_emails_importance ON emails(importance)')
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_emails_category ON emails(category)')
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_todos_status ON todos(status)')
+
+            # 初始化默认 Prompt 模板
             try:
                 from core.default_prompts import DEFAULT_PROMPTS
                 for skill_name, default_prompt in DEFAULT_PROMPTS.items():

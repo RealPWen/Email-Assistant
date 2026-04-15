@@ -37,13 +37,48 @@ document.addEventListener('DOMContentLoaded', () => {
             .then(res => res.json())
             .then(data => {
                 currentEmails = data;
+                // --- 优化：保存数据到本地缓存 ---
+                localStorage.setItem('deepmail_emails_cache', JSON.stringify(data));
+                localStorage.setItem('deepmail_cache_time', Date.now());
+                
                 applyFilters();
                 updateStats(data);
             });
         } catch (error) {
             console.error('Failed to fetch emails:', error);
-            emailListElement.innerHTML = '<div class="error">无法连接到服务器</div>';
+            // 如果拉取失败且没有本地缓存，才显示错误
+            if (currentEmails.length === 0) {
+                emailListElement.innerHTML = '<div class="error">无法连接到服务器</div>';
+            }
         }
+    }
+
+    // --- 优化：从本地缓存瞬时加载 ---
+    function loadCache() {
+        const cachedData = localStorage.getItem('deepmail_emails_cache');
+        const cachedStats = localStorage.getItem('deepmail_stats_cache');
+        
+        if (cachedData) {
+            try {
+                currentEmails = JSON.parse(cachedData);
+                console.log('🚀 已从本地 L1 Cache 加载数据');
+                applyFilters();
+                
+                // 如果有缓存的统计数据也一并加载
+                if (cachedStats) {
+                    const stats = JSON.parse(cachedStats);
+                    renderStats(stats);
+                }
+            } catch (e) {
+                console.warn('Cache corrupted:', e);
+            }
+        }
+    }
+
+    function renderStats(stats) {
+        document.getElementById('stat-total').textContent = stats.total_emails || 0;
+        // 保存一份统计缓存
+        localStorage.setItem('deepmail_stats_cache', JSON.stringify(stats));
     }
 
     function applyFilters() {
@@ -329,8 +364,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // First, fetch the official counts from the backend
         try {
             const stats = await fetch('/api/stats').then(res => res.json());
-            document.getElementById('stat-total').textContent = stats.total_emails || 0;
-            // Unread and Important could be displayed too if we add UI elements for them
+            renderStats(stats);
         } catch (e) {
             console.error('Failed to fetch official stats:', e);
             if (emails) document.getElementById('stat-total').textContent = emails.length;
@@ -560,6 +594,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Initial Load
-    fetchEmails();
+    // --- 启动序列优化 ---
+    loadCache();    // 1. 立即加载缓存（瞬时响应）
+    fetchEmails();  // 2. 后台获取最新数据（无感刷新）
 });
