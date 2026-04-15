@@ -167,57 +167,393 @@ body.todo-theme {
     min-height: 0; /* Crucial for nested flexbox scrolling */
 }
 
-.task-item {
-    background: white;
+/* Integrated Todo Workspace */
+.todo-workspace {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    background: #fff;
+}
+
+.todo-grid {
+    grid-template-columns: 1fr 320px;
+}
+
+.todo-main-pane {
+    padding: 30px;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    border-right: 1px solid var(--border-color);
+}
+
+.workspace-search {
+    margin-bottom: 20px;
+    background: #f8f9fa;
+    border-radius: 12px;
+    padding: 5px 15px;
+}
+
+.task-list-container {
+    flex: 1;
+    overflow-y: auto;
+}
+
+.todo-sidebar-pane {
+    padding: 30px;
+    background: #fcfcfc;
+    overflow-y: auto;
+}
+
+.calendar-card {
+    background: #fff;
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    padding: 20px;
+    margin-bottom: 25px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.02);
+}
+
+.calendar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.month-label {
+    font-weight: 700;
+    color: var(--accent-sage-dark);
+}
+
+.calendar-nav {
+    display: flex;
+    gap: 8px;
+}
+
+.calendar-grid-container {
+    font-size: 0.85rem;
+}
+
+.todo-legend-card {
+    background: #fff;
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    padding: 20px;
+}
+
+.legend-label {
+    font-size: 0.75rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 15px;
+}
+
+.legend-items {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+/* Integrated Todo Workspace Calendar Styles */
+.todo-workspace .day-cell {
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.85rem;
+    font-weight: 500;
+    border-radius: 8px;
+    cursor: pointer;
+    position: relative;
+    transition: all 0.2s;
+    background: #fff;
+    border: 1px solid transparent;
+}
+
+.todo-workspace .day-cell:hover:not(.other-month) {
+    background: var(--bg-active);
+    color: var(--accent-sage);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+}
+
+.todo-workspace .day-cell.today-cell {
+    background: var(--accent-sage);
+    color: #fff !important;
+    font-weight: bold;
+    box-shadow: 0 4px 12px rgba(45, 106, 79, 0.3);
+}
+
+.todo-workspace .day-cell.today-cell.has-priority::after {
+    background: #fff !important; /* White indicator dot for today */
+}
+
+.todo-workspace .day-cell.active-cell {
+    border: 2px solid var(--accent-sage);
+    color: var(--accent-sage);
+    background: var(--bg-active);
+}
+
+/* Priority Marking for Calendar Cells - Enhanced Sage Style */
+.todo-workspace .day-cell.has-priority::after {
+    content: '';
+    position: absolute;
+    bottom: 5px;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+}
+
+.todo-workspace .day-cell.priority-high {
+    border-top: 4px solid #d13438;
+    background: rgba(209, 52, 56, 0.05);
+    font-weight: 800;
+}
+.todo-workspace .day-cell.priority-high::after {
+    background: #d13438;
+    box-shadow: 0 0 6px rgba(209, 52, 56, 0.6);
+}
+
+.todo-workspace .day-cell.priority-normal {
+    border-top: 3px solid var(--accent-sage);
+    background: rgba(45, 106, 79, 0.03);
+    font-weight: 700;
+}
+.todo-workspace .day-cell.priority-normal::after {
+    background: var(--accent-sage);
+}
+
+.todo-workspace .day-cell.priority-low {
+    border-top: 3px solid #4caf50;
+    background: rgba(76, 175, 80, 0.02);
+}
+.todo-workspace .day-cell.priority-low::after {
+    background: #4caf50;
+}
+
+/* Ensure today and active still look right with priority borders */
+.todo-workspace .day-cell.today-cell.has-priority {
+    border-top-color: transparent; /* No top border for today */
+}
+.todo-workspace .day-cell.active-cell.has-priority {
+    border-top-width: 2px; /* Thinner border-top when active border is there */
+}
+
+/* Legend Styling - Refined Pills */
+.todo-workspace .todo-legend-card {
+    background: #fff;
+    border: 1px solid var(--border-color);
     border-radius: 20px;
     padding: 24px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.02);
+}
+
+.todo-workspace .legend-label {
+    font-size: 0.75rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    color: var(--accent-sage-dark);
+    letter-spacing: 0.12em;
     margin-bottom: 20px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid var(--bg-active);
     display: flex;
-    gap: 20px;
-    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-    border: 1px solid transparent;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.01);
+    align-items: center;
+    gap: 8px;
 }
 
-.task-item:hover {
-    transform: scale(1.02);
-    box-shadow: 0 15px 30px rgba(0,0,0,0.05);
-    border-color: rgba(99, 102, 241, 0.1);
-}
-
-.task-item.completed {
-    background: rgba(255, 255, 255, 0.4);
-    box-shadow: none;
-}
-
-.task-item.completed .task-title {
-    text-decoration: line-through;
-    color: var(--text-muted);
-}
-
-.priority-line {
-    width: 5px;
+.todo-workspace .legend-label::before {
+    content: '';
+    width: 4px;
+    height: 14px;
+    background: var(--accent-sage);
     border-radius: 10px;
 }
 
-.priority-high { background: var(--danger); }
-.priority-normal { background: var(--primary); }
-.priority-low { background: var(--success); }
+.todo-workspace .legend-items {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
 
-.task-body { flex: 1; }
+.todo-workspace .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 16px;
+    border-radius: 12px;
+    background: #f8fafc;
+    border: 1px solid #f1f5f9;
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.todo-workspace .legend-item:hover {
+    background: #fff;
+    border-color: var(--accent-sage);
+    transform: translateX(8px);
+    box-shadow: 0 4px 12px rgba(45, 106, 79, 0.05);
+}
+
+.todo-workspace .legend-text {
+    line-height: 1.4;
+    color: var(--text-main);
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.todo-workspace .dot {
+    flex-shrink: 0;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 2px solid #fff;
+    box-shadow: 0 0 0 1px rgba(0,0,0,0.05);
+}
+
+.todo-workspace .dot-high { 
+    background: #d13438; 
+    box-shadow: 0 0 8px rgba(209, 52, 56, 0.4), 0 0 0 1px rgba(0,0,0,0.05);
+}
+.todo-workspace .dot-normal { 
+    background: var(--accent-sage); 
+    box-shadow: 0 0 8px rgba(45, 106, 79, 0.3), 0 0 0 1px rgba(0,0,0,0.05);
+}
+.todo-workspace .dot-low { 
+    background: #4caf50; 
+    box-shadow: 0 0 8px rgba(76, 175, 80, 0.3), 0 0 0 1px rgba(0,0,0,0.05);
+}
+
+/* Base styles for standalone page or fallback */
+.day-cell {
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.95rem;
+    font-weight: 600;
+    border-radius: 16px;
+    cursor: pointer;
+    position: relative;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.legend-items {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+}
+
+.dot { 
+    width: 8px; 
+    height: 8px; 
+    border-radius: 50%; 
+}
+
+/* Task Item Integrated Style */
+.todo-workspace .task-item {
+    padding: 20px;
+    border-radius: 16px;
+}
+
+@media (max-width: 992px) {
+    .todo-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .todo-main-pane {
+        border-right: none;
+        border-bottom: 1px solid var(--border-color);
+    }
+}
+
+.task-item {
+    background: #fff;
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 15px;
+    display: flex;
+    gap: 15px;
+    align-items: flex-start;
+    transition: all 0.2s ease;
+    border: 1px solid var(--border-color);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+}
+
+.task-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 16px rgba(0,0,0,0.05);
+    border-color: var(--accent-sage);
+}
 
 .task-title {
-    font-size: 1.15rem;
-    font-weight: 700;
-    margin-bottom: 8px;
-    color: #1e293b;
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 6px;
+    color: var(--accent-sage-dark);
+    overflow-wrap: anywhere;
+    word-break: break-word;
 }
 
 .task-desc {
-    font-size: 0.95rem;
+    font-size: 0.85rem;
     color: var(--text-muted);
-    line-height: 1.6;
-    margin-bottom: 16px;
+    line-height: 1.5;
+    margin-bottom: 12px;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    white-space: normal;
+}
+
+.day-cell {
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.85rem;
+    font-weight: 500;
+    border-radius: 8px;
+    cursor: pointer;
+    position: relative;
+    transition: all 0.2s;
+    background: #fff;
+    border: 1px solid transparent;
+}
+
+.day-cell:hover:not(.other-month) {
+    background: var(--bg-active);
+    color: var(--accent-sage);
+}
+
+.day-cell.today-cell {
+    background: var(--accent-sage);
+    color: #fff;
+    font-weight: bold;
+}
+
+.day-cell.active-cell {
+    border: 1px solid var(--accent-sage);
+    color: var(--accent-sage);
+    background: var(--bg-active);
+}
+
+.day-cell.has-todos::after {
+    content: '';
+    position: absolute;
+    bottom: 4px;
+    width: 3px;
+    height: 3px;
+    background: currentColor;
+    border-radius: 50%;
 }
 
 .task-footer {
@@ -336,22 +672,23 @@ body.todo-theme {
     padding: 0 32px 32px 32px;
 }
 
-.weekdays-row {
+.todo-workspace .weekdays-row {
     display: grid;
     grid-template-columns: repeat(7, 1fr);
     margin-bottom: 12px;
 }
 
-.weekday {
+.todo-workspace .weekday {
     text-align: center;
     font-size: 0.75rem;
     font-weight: 800;
     text-transform: uppercase;
     color: var(--text-muted);
     letter-spacing: 0.05em;
+    padding: 5px 0;
 }
 
-.days-grid {
+.todo-workspace .days-grid {
     display: grid;
     grid-template-columns: repeat(7, 1fr);
     gap: 8px;

@@ -1,151 +1,203 @@
 let currentPrompts = {};
+let activeSkill = null;
 
 // 初始化加载所有 prompts
+window.initPromptLab = async function() {
+    const skillList = document.getElementById('skill-list');
+    // Check if skills are already loaded (tabs exist)
+    if (!skillList || skillList.querySelectorAll('.skill-tab').length === 0) {
+        await fetchPrompts();
+    }
+};
+
 async function fetchPrompts() {
     try {
         const res = await fetch('/api/prompts');
         const data = await res.json();
         
-        // 转换为键值对形式
-        data.forEach(item => {
-            currentPrompts[item.skill_name] = item.system_prompt;
+        // 渲染左侧列表
+        const skillList = document.getElementById('skill-list');
+        skillList.innerHTML = data.map(skill => `
+            <li class="skill-tab" data-skill="${skill.skill_name}" style="padding: 12px 15px; border-radius: 8px; margin-bottom: 8px; cursor: pointer; display: flex; align-items: center; gap: 10px; transition: all 0.2s; border-left: 3px solid transparent;">
+                <i class="fas ${getSkillIcon(skill.skill_name)}" style="width: 20px; text-align: center; color: var(--text-muted);"></i>
+                <span style="font-size: 0.9rem; font-weight: 500; color: var(--text-main);">${formatSkillName(skill.skill_name)}</span>
+            </li>
+        `).join('');
+
+        // 绑定点击事件
+        skillList.querySelectorAll('.skill-tab').forEach(tab => {
+            tab.addEventListener('click', () => selectSkill(tab.dataset.skill, data.find(s => s.skill_name === tab.dataset.skill)));
         });
-        
-        loadPrompt();
+
+        // 默认选择第一个
+        if (data.length > 0 && !activeSkill) {
+            const firstSkill = data[0];
+            selectSkill(firstSkill.skill_name, firstSkill);
+        }
     } catch (e) {
         console.error("加载失败:", e);
-        document.getElementById('prompt-editor').value = "加载提示词失败。";
     }
 }
 
-function loadPrompt() {
-    const skill = document.getElementById('skill-select').value;
-    const editor = document.getElementById('prompt-editor');
-    editor.value = currentPrompts[skill] || "No prompt found.";
+function selectSkill(skillName, skillData) {
+    if (!skillData) return;
+    activeSkill = skillName;
+    
+    // UI 高亮切换
+    document.querySelectorAll('.skill-tab').forEach(tab => {
+        if (tab.dataset.skill === skillName) {
+            tab.style.background = 'var(--bg-active)';
+            tab.style.borderColor = 'var(--accent-sage)';
+            tab.querySelector('i').style.color = 'var(--accent-sage)';
+        } else {
+            tab.style.background = 'transparent';
+            tab.style.borderColor = 'transparent';
+            tab.querySelector('i').style.color = 'var(--text-muted)';
+        }
+    });
+
+    // 切换编辑器
+    const placeholder = document.getElementById('editor-placeholder');
+    const area = document.getElementById('editor-area');
+    if (placeholder) placeholder.classList.add('hidden');
+    if (area) area.classList.remove('hidden');
+    
+    const nameEl = document.getElementById('active-skill-name');
+    const textEl = document.getElementById('prompt-textarea');
+    if (nameEl) nameEl.innerText = formatSkillName(skillName);
+    if (textEl) textEl.value = skillData.system_prompt || '';
 }
 
 async function savePrompt() {
-    const skill = document.getElementById('skill-select').value;
-    const content = document.getElementById('prompt-editor').value;
-    
+    if (!activeSkill) return;
+    const content = document.getElementById('prompt-textarea').value;
+    const saveBtn = document.getElementById('save-prompt');
+    const originalText = saveBtn.innerHTML;
+
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 保存中...';
+
     try {
-        const res = await fetch(`/api/prompts/${skill}`, {
+        const res = await fetch(`/api/prompts/${activeSkill}`, {
             method: 'PUT',
-            headers:{ 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ system_prompt: content })
         });
-        if(res.ok) {
-            currentPrompts[skill] = content;
-            showToast();
+        if (res.ok) {
+            CommonUI.showToast("已应用指令更新");
         }
     } catch (e) {
         alert('保存失败!');
+    } finally {
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = originalText;
     }
 }
 
 async function restoreDefault() {
-    if(!confirm("确定要恢复默认设定吗？这会覆盖所有的个性化修改。")) return;
+    if (!activeSkill || !confirm("确定要恢复默认设定吗？这会覆盖所有的个性化修改。")) return;
     
-    const skill = document.getElementById('skill-select').value;
     try {
-        const res = await fetch(`/api/prompts/${skill}/restore`, { method: 'POST' });
-        if(res.ok) {
-            await fetchPrompts(); // 刷新数据
-            showToast("已恢复默认");
+        const res = await fetch(`/api/prompts/${activeSkill}/restore`, { method: 'POST' });
+        if (res.ok) {
+            await fetchPrompts(); // 刷新
+            CommonUI.showToast("已重置为默认指令");
         }
     } catch (e) {
         alert('恢复失败!');
     }
 }
 
-function showToast(msg = "已保存修改 (立刻生效)") {
-    const toast = document.getElementById('toast');
-    toast.innerHTML = `<i class="fas fa-check-circle"></i> ${msg}`;
-    toast.style.display = 'inline-block';
-    setTimeout(() => { toast.style.display = 'none'; }, 3000);
-}
+async function optimizePrompt() {
+    if (!activeSkill) return;
+    const requestInput = document.getElementById('optimize-request');
+    const requestText = requestInput.value.trim();
+    if (!requestText) {
+        alert('请输入优化需求');
+        return;
+    }
 
-// --- Chat Interaction ---
-function appendMessage(sender, text) {
-    const container = document.getElementById('chat-messages');
-    const msgDiv = document.createElement('div');
-    msgDiv.className = `message ${sender}`;
-    msgDiv.innerText = text;
-    container.appendChild(msgDiv);
-    container.scrollTop = container.scrollHeight;
-}
+    const optimizeBtn = document.getElementById('optimize-prompt');
+    const statusOverlay = document.getElementById('optimizer-status');
+    const statusText = document.getElementById('optimizer-text');
+    const editor = document.getElementById('prompt-textarea');
 
-async function handleOptimize(e) {
-    e.preventDefault();
-    const input = document.getElementById('user-input');
-    const text = input.value.trim();
-    if(!text) return;
-
-    const skill = document.getElementById('skill-select').value;
+    optimizeBtn.disabled = true;
+    statusOverlay.classList.remove('hidden');
+    statusText.innerText = "AI 正在优化指令...";
     
-    appendMessage('user', text);
-    input.value = '';
-    
-    const btn = document.getElementById('send-btn');
-    const indicator = document.getElementById('typing-indicator');
-    btn.disabled = true;
-    indicator.style.display = 'block';
-
     try {
-        const res = await fetch(`/api/prompts/${skill}/optimize`, {
+        const res = await fetch(`/api/prompts/${activeSkill}/optimize`, {
             method: 'POST',
-            headers:{ 'Content-Type': 'application/json' },
-            body: JSON.stringify({ user_request: text })
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_request: requestText })
         });
-        
-        if (!res.ok) {
-            appendMessage('system', '网络请求失败。');
-            return;
-        }
-        
-        const editor = document.getElementById('prompt-editor');
-        editor.value = ""; // 清空编辑器，准备流式写入
-        
-        const container = document.getElementById('chat-messages');
-        const sysMsgDiv = document.createElement('div');
-        sysMsgDiv.className = `message system`;
-        sysMsgDiv.innerText = "正在为您重写左侧的系统指令...";
-        container.appendChild(sysMsgDiv);
-        container.scrollTop = container.scrollHeight;
-        
+
+        if (!res.ok) throw new Error("优化请求失败");
+
+        editor.value = ""; // 清空并准备接收流
         const reader = res.body.getReader();
         const decoder = new TextDecoder("utf-8");
         let done = false;
-        let fullText = "";
-        
+
         while (!done) {
             const { value, done: readerDone } = await reader.read();
             done = readerDone;
             if (value) {
                 const chunk = decoder.decode(value, { stream: true });
-                fullText += chunk;
-                
-                let displayText = fullText;
-                if (displayText.startsWith("```json\n")) displayText = displayText.substring(8);
-                else if (displayText.startsWith("```\n")) displayText = displayText.substring(4);
-                else if (displayText.startsWith("```")) displayText = displayText.substring(3);
-                if (displayText.endsWith("```")) displayText = displayText.slice(0, -3);
-                
-                editor.value = displayText;
+                // Remove markdown code fences if present in stream
+                let cleanChunk = chunk.replace(/```json\n?|```\n?/g, "");
+                editor.value += cleanChunk;
+                editor.scrollTop = editor.scrollHeight;
             }
         }
-        
-        editor.style.transition = 'background 0.3s';
-        editor.style.background = '#e8f8f5';
-        setTimeout(() => editor.style.background = '#fdfdfd', 800);
-        sysMsgDiv.innerText = "重写完成！您可以审核并在右上方点击“保存更新”使其生效。";
-        
+
+        statusText.innerText = "优化完成！审核后请保存。";
+        requestInput.value = "";
+        setTimeout(() => statusOverlay.classList.add('hidden'), 3000);
+
     } catch (error) {
-        appendMessage('system', '网络请求错误，请重试。: ' + error);
+        console.error("Optimization failed:", error);
+        statusText.innerText = "优化失败: " + error.message;
+        setTimeout(() => statusOverlay.classList.add('hidden'), 5000);
     } finally {
-        btn.disabled = false;
-        indicator.style.display = 'none';
+        optimizeBtn.disabled = false;
     }
 }
 
-document.addEventListener('DOMContentLoaded', fetchPrompts);
+function formatSkillName(name) {
+    const mapping = {
+        'summary': '邮件摘要 (Email Summary)',
+        'todo': '待办提取 (Todo Extraction)',
+        'translation': '智能翻译 (AI Translation)',
+        'meta': 'Prompt 优化器 (Meta Skill)'
+    };
+    return mapping[name] || name;
+}
+
+function getSkillIcon(name) {
+    const mapping = {
+        'summary': 'fa-file-alt',
+        'todo': 'fa-check-double',
+        'translation': 'fa-language',
+        'meta': 'fa-magic'
+    };
+    return mapping[name] || 'fa-cog';
+}
+
+// 绑定主界面按钮
+document.addEventListener('DOMContentLoaded', () => {
+    const saveBtn = document.getElementById('save-prompt');
+    const restoreBtn = document.getElementById('restore-prompt');
+    const optimizeBtn = document.getElementById('optimize-prompt');
+    const optimizeInput = document.getElementById('optimize-request');
+    
+    if (saveBtn) saveBtn.addEventListener('click', savePrompt);
+    if (restoreBtn) restoreBtn.addEventListener('click', restoreDefault);
+    if (optimizeBtn) optimizeBtn.addEventListener('click', optimizePrompt);
+    if (optimizeInput) {
+        optimizeInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') optimizePrompt();
+        });
+    }
+});

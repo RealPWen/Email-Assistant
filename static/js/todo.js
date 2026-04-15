@@ -5,13 +5,13 @@ document.addEventListener('DOMContentLoaded', () => {
     let searchQuery = '';
 
     const dom = {
-        taskList: document.getElementById('task-list'),
-        calendarDays: document.getElementById('calendar-days'),
-        monthYear: document.getElementById('calendar-month-year'),
-        prevBtn: document.getElementById('prev-month'),
-        nextBtn: document.getElementById('next-month'),
+        taskList: document.getElementById('task-list-integrated') || document.getElementById('task-list'),
+        calendarDays: document.getElementById('calendar-days-integrated') || document.getElementById('calendar-days'),
+        monthYear: document.getElementById('calendar-month-year-integrated') || document.getElementById('calendar-month-year'),
+        prevBtn: document.getElementById('prev-month-integrated') || document.getElementById('prev-month'),
+        nextBtn: document.getElementById('next-month-integrated') || document.getElementById('next-month'),
         toast: document.getElementById('toast'),
-        searchInput: document.getElementById('task-search')
+        searchInput: document.getElementById('task-search-integrated') || document.getElementById('task-search')
     };
 
     const modalDom = {
@@ -62,6 +62,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function setupListeners() {
+        if (!dom.prevBtn || !dom.nextBtn || !dom.searchInput) return;
         dom.prevBtn.addEventListener('click', () => {
             currentViewDate.setMonth(currentViewDate.getMonth() - 1);
             renderCalendar();
@@ -79,6 +80,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Task Rendering ---
+    window.refreshTodoView = () => {
+        fetchTodos().then(() => {
+            renderTasks();
+            renderCalendar();
+        });
+    };
+
     function renderTasks() {
         let filtered = [...todos];
         
@@ -169,7 +177,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const daysInMonth = new Date(year, month + 1, 0).getDate();
         const prevDaysInMonth = new Date(year, month, 0).getDate();
         
-        const taskDays = new Set(todos.filter(t => !t.status).map(t => t.due_date));
+        // Calculate max priority per date
+        const datePriority = new Map();
+        todos.filter(t => !t.status).forEach(t => {
+            const p = t.priority.toLowerCase();
+            const existing = datePriority.get(t.due_date);
+            if (!existing || (p === 'high') || (p === 'normal' && existing === 'low')) {
+                datePriority.set(t.due_date, p);
+            }
+        });
 
         let daysHtml = '';
         const today = new Date().toISOString().split('T')[0];
@@ -183,11 +199,11 @@ document.addEventListener('DOMContentLoaded', () => {
         for (let i = 1; i <= daysInMonth; i++) {
             const dStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
             const isToday = dStr === today;
-            const hasTask = taskDays.has(dStr);
+            const priority = datePriority.get(dStr);
             const isActive = dStr === activeFilterDate;
 
             daysHtml += `
-                <div class="day-cell ${isToday ? 'today-cell' : ''} ${hasTask ? 'has-todos' : ''} ${isActive ? 'active-cell' : ''}" 
+                <div class="day-cell ${isToday ? 'today-cell' : ''} ${priority ? 'has-priority priority-' + priority : ''} ${isActive ? 'active-cell' : ''}" 
                      onclick="window.setFilterDate('${dStr}')">
                     ${i}
                 </div>`;
@@ -295,9 +311,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Modal listeners
-    modalDom.cancelBtn.addEventListener('click', closeEditModal);
-    modalDom.closeBtn.addEventListener('click', closeEditModal);
-    modalDom.saveBtn.addEventListener('click', handleSaveModal);
+    if (modalDom.cancelBtn) modalDom.cancelBtn.addEventListener('click', closeEditModal);
+    if (modalDom.closeBtn) modalDom.closeBtn.addEventListener('click', closeEditModal);
+    if (modalDom.saveBtn) modalDom.saveBtn.addEventListener('click', handleSaveModal);
 
     // Use CommonUI for Toast and Date Formatting
     function showToast(msg) { CommonUI.showToast(msg); }

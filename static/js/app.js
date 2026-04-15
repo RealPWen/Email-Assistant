@@ -190,6 +190,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function showLoadingState() {
+        const promptLabView = document.getElementById('prompt-lab-view');
+        if (promptLabView) promptLabView.classList.add('hidden');
         welcomeView.classList.add('hidden');
         detailView.classList.remove('hidden');
         dom.subject.textContent = '正在加载...';
@@ -199,6 +201,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function displayEmail(email) {
+        const promptLabView = document.getElementById('prompt-lab-view');
+        if (promptLabView) promptLabView.classList.add('hidden');
         welcomeView.classList.add('hidden');
         detailView.classList.remove('hidden');
 
@@ -293,6 +297,11 @@ document.addEventListener('DOMContentLoaded', () => {
         categoryList.querySelectorAll('.category-item').forEach(item => {
             item.addEventListener('click', (e) => {
                 e.stopPropagation(); // Avoid parent toggle
+                const promptLabView = document.getElementById('prompt-lab-view');
+                if (promptLabView) promptLabView.classList.add('hidden');
+                if (detailView.classList.contains('hidden')) {
+                    welcomeView.classList.remove('hidden');
+                }
                 
                 // Clear all active states
                 document.querySelectorAll('.folder-list li, .category-item, .folder-item, .folder-header').forEach(el => el.classList.remove('active'));
@@ -310,7 +319,104 @@ document.addEventListener('DOMContentLoaded', () => {
     function setupSidebar() {
         const archiveItem = document.getElementById('folder-archive');
         const archiveHeader = document.getElementById('archive-header');
-        const folderItems = document.querySelectorAll('.folder-list > li:not(.expandable)');
+        const folderItems = document.querySelectorAll('.folder-list > li:not(.expandable):not(#folder-tasks):not(#folder-prompt-lab)');
+        const tasksItem = document.getElementById('folder-tasks');
+        const promptLabItem = document.getElementById('folder-prompt-lab');
+        const promptLabView = document.getElementById('prompt-lab-view');
+        const inboxItem = document.getElementById('folder-inbox');
+
+        const todoWorkspaceView = document.getElementById('todo-workspace-view');
+
+        const openInboxView = () => {
+            const appContainer = document.querySelector('.app-container');
+            if (appContainer) {
+                appContainer.classList.remove('workspace-mode-active');
+                appContainer.classList.remove('todo-mode-active');
+                appContainer.classList.remove('prompt-lab-mode-active');
+            }
+            if (todoWorkspaceView) todoWorkspaceView.classList.add('hidden');
+            if (promptLabView) promptLabView.classList.add('hidden');
+            detailView.classList.add('hidden');
+            welcomeView.classList.remove('hidden');
+        };
+
+        const openPromptLab = () => {
+            if (!promptLabView || !promptLabItem) return;
+
+            // Update mode for full-width workspace
+            const appContainer = document.querySelector('.app-container');
+            if (appContainer) {
+                appContainer.classList.add('workspace-mode-active');
+                appContainer.classList.remove('todo-mode-active');
+                appContainer.classList.add('prompt-lab-mode-active');
+            }
+
+            // Hide everything else in the content panel
+            if (welcomeView) welcomeView.classList.add('hidden');
+            if (detailView) detailView.classList.add('hidden');
+            
+            // Show Prompt Lab
+            promptLabView.classList.remove('hidden');
+            if (todoWorkspaceView) todoWorkspaceView.classList.add('hidden');
+            
+            // Highlight sidebar
+            document.querySelectorAll('.folder-list li, .category-item, .folder-item, .folder-header').forEach(el => el.classList.remove('active'));
+            if (promptLabItem) promptLabItem.classList.add('active');
+            
+            // Re-init Prompt Lab Logic
+            if (window.initPromptLab) window.initPromptLab();
+        };
+
+        const openTodoDrawer = () => {
+            // Update mode for full-width workspace
+            const appContainer = document.querySelector('.app-container');
+            if (appContainer) {
+                appContainer.classList.add('workspace-mode-active');
+                appContainer.classList.add('todo-mode-active');
+                appContainer.classList.remove('prompt-lab-mode-active');
+            }
+
+            // Hide normal views
+            if (welcomeView) welcomeView.classList.add('hidden');
+            if (detailView) detailView.classList.add('hidden');
+            if (promptLabView) promptLabView.classList.add('hidden');
+
+            if (todoWorkspaceView) {
+                todoWorkspaceView.classList.remove('hidden');
+            }
+            
+            // Re-init todo view if not already
+            if (window.refreshTodoView) window.refreshTodoView();
+        };
+
+        const closeTodoDrawer = () => {
+            if (todoWorkspaceView) todoWorkspaceView.classList.add('hidden');
+            
+            const appContainer = document.querySelector('.app-container');
+            if (appContainer) {
+                appContainer.classList.remove('workspace-mode-active');
+                appContainer.classList.remove('todo-mode-active');
+            }
+            openInboxView();
+        };
+
+        if (tasksItem) {
+            tasksItem.addEventListener('click', (e) => {
+                // Keep sidebar active highlight consistent with other folders
+                document.querySelectorAll('.folder-list li, .category-item, .folder-item, .folder-header').forEach(el => el.classList.remove('active'));
+                tasksItem.classList.add('active');
+                if (promptLabView) promptLabView.classList.add('hidden');
+                openTodoDrawer();
+                e.preventDefault();
+            });
+        }
+
+        if (promptLabItem) {
+            promptLabItem.addEventListener('click', (e) => {
+                openPromptLab();
+                e.preventDefault();
+            });
+        }
 
         // Archive Toggle
         archiveHeader.addEventListener('click', (e) => {
@@ -343,6 +449,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Set Active State
                 document.querySelectorAll('.folder-list li, .category-item, .folder-item, .folder-header').forEach(el => el.classList.remove('active'));
                 item.classList.add('active');
+
+                // Leave Prompt Lab and return to mail flow
+                const isPromptOpen = promptLabView && !promptLabView.classList.contains('hidden');
+                if (promptLabView) promptLabView.classList.add('hidden');
+                if (item === inboxItem || isPromptOpen) openInboxView();
                 
                 currentFilter = (item.id === 'folder-important') ? 'high' : 'all';
                 applyFilters();
@@ -413,8 +524,10 @@ document.addEventListener('DOMContentLoaded', () => {
         target.scrollTop = percentage * (target.scrollHeight - target.clientHeight);
     };
 
-    panelOriginal.addEventListener('scroll', () => syncScroll(panelOriginal, panelTranslation));
-    panelTranslation.addEventListener('scroll', () => syncScroll(panelTranslation, panelOriginal));
+    if (panelOriginal && panelTranslation) {
+        panelOriginal.addEventListener('scroll', () => syncScroll(panelOriginal, panelTranslation));
+        panelTranslation.addEventListener('scroll', () => syncScroll(panelTranslation, panelOriginal));
+    }
 
     // --- View Toggle Logic ---
     const updateActiveButton = (id) => {
@@ -433,20 +546,27 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    document.getElementById('btn-split').addEventListener('click', () => {
-        document.getElementById('body-container').className = 'body-container split-view';
-        updateActiveButton('btn-split');
-    });
+    const splitBtn = document.getElementById('btn-split');
+    const originalBtn = document.getElementById('btn-original');
+    const translationBtn = document.getElementById('btn-translation');
+    const bodyContainer = document.getElementById('body-container');
 
-    document.getElementById('btn-original').addEventListener('click', () => {
-        document.getElementById('body-container').className = 'body-container only-original';
-        updateActiveButton('btn-original');
-    });
+    if (splitBtn && originalBtn && translationBtn && bodyContainer) {
+        splitBtn.addEventListener('click', () => {
+            bodyContainer.className = 'body-container split-view';
+            updateActiveButton('btn-split');
+        });
 
-    document.getElementById('btn-translation').addEventListener('click', () => {
-        document.getElementById('body-container').className = 'body-container only-translation';
-        updateActiveButton('btn-translation');
-    });
+        originalBtn.addEventListener('click', () => {
+            bodyContainer.className = 'body-container only-original';
+            updateActiveButton('btn-original');
+        });
+
+        translationBtn.addEventListener('click', () => {
+            bodyContainer.className = 'body-container only-translation';
+            updateActiveButton('btn-translation');
+        });
+    }
 
     // --- Filtering Logic ---
     const filterSelect = document.getElementById('filter-importance');
