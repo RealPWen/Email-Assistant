@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DeepMail AI - 智能邮件审计系统</title>
     <link rel="stylesheet" href="/static/css/common.css?v=1.0">
-    <link rel="stylesheet" href="/static/css/styles.css?v=2.2">
-    <link rel="stylesheet" href="/static/css/todo.css?v=2.2">
+    <link rel="stylesheet" href="/static/css/styles.css?v=2.5">
+    <link rel="stylesheet" href="/static/css/todo.css?v=2.5">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body class="light-theme">
@@ -20,8 +20,8 @@
             <ul class="folder-list">
                 <li id="folder-inbox" class="active"><div class="folder-item"><i class="fas fa-inbox"></i> <span>收件箱</span></div></li>
                 <li id="folder-important"><div class="folder-item"><i class="fas fa-star"></i> <span>重要邮件</span></div></li>
-                <li id="folder-tasks" onclick="window.location.href='/todo'"><div class="folder-item"><i class="fas fa-tasks"></i> <span>待办事项</span></div></li>
-                <li id="folder-prompt-lab" onclick="window.location.href='/prompt-lab'"><div class="folder-item"><i class="fas fa-brain"></i> <span>Prompt Lab</span></div></li>
+                <li id="folder-tasks"><div class="folder-item"><i class="fas fa-tasks"></i> <span>待办事项</span></div></li>
+                <li id="folder-prompt-lab"><div class="folder-item"><i class="fas fa-brain"></i> <span>Prompt Lab</span></div></li>
                 <li id="folder-archive" class="expandable">
                     <div class="folder-header" id="archive-header">
                         <i class="fas fa-archive"></i>
@@ -98,6 +98,67 @@
                 <p>由 DeepSeek-R1 提供 AI 驱动的摘要与翻译</p>
             </div>
 
+            <!-- New: Prompt Lab View -->
+            <div id="prompt-lab-view" class="hidden prompt-lab-workspace">
+                <header class="workspace-header">
+                    <div class="header-info">
+                        <h2 class="workspace-title">
+                            <i class="fas fa-vial"></i> Prompt Lab <span class="badge badge-mint">AI Core Settings</span>
+                        </h2>
+                        <p class="workspace-subtitle">自定义驱动 AI 技能的核心指令，调整摘要风格或待办提取逻辑。</p>
+                    </div>
+                </header>
+
+                <div class="workspace-body-grid">
+                    <!-- Left: Skill List -->
+                    <aside class="workspace-sidebar">
+                        <div class="sidebar-label">可用 AI 技能</div>
+                        <ul id="skill-list" class="skill-list-container">
+                            <!-- Dynamically loaded skills -->
+                        </ul>
+                    </aside>
+
+                    <!-- Right: Editor Area -->
+                    <section id="editor-area" class="hidden editor-pane">
+                        <div class="editor-header">
+                            <div class="skill-info">
+                                <h3 id="active-skill-name" class="active-skill-title">选择一个技能</h3>
+                                <p class="skill-subtitle">正在编辑该技能的系统级 Prompt 指令。</p>
+                            </div>
+                            <div class="editor-actions">
+                                <div class="optimize-group" style="display: flex; gap: 8px; margin-right: 15px; background: #f0f7f4; padding: 4px 8px; border-radius: 10px; border: 1px solid var(--accent-sage);">
+                                    <input type="text" id="optimize-request" placeholder="输入优化需求 (例如：更简洁点)" style="border: none; background: transparent; font-size: 0.85rem; outline: none; width: 200px; color: var(--accent-sage-dark);">
+                                    <button id="optimize-prompt" class="btn-icon-text" style="background: var(--accent-sage); color: white; border: none; padding: 4px 12px; height: 28px;" title="使用 AI 优化指令">
+                                        <i class="fas fa-magic"></i> 优化
+                                    </button>
+                                </div>
+                                <button id="restore-prompt" class="btn-secondary"><i class="fas fa-undo"></i> 恢复默认</button>
+                                <button id="save-prompt" class="btn-primary"><i class="fas fa-save"></i> 保存更新</button>
+                            </div>
+                        </div>
+
+                        <!-- Main Editor Container -->
+                        <div class="editor-container">
+                            <div class="editor-terminal-header">
+                                <i class="fas fa-terminal"></i> SYSTEM_INSTRUCTIONS_ROOT
+                            </div>
+                            <textarea id="prompt-textarea" spellcheck="false" class="prompt-editor-field"></textarea>
+                        </div>
+                        
+                        <!-- Optimization Suggestion Overlay -->
+                        <div id="optimizer-status" class="hidden optimizer-overlay">
+                            <i class="fas fa-magic"></i> <span id="optimizer-text">AI 正在优化指令...</span>
+                        </div>
+                    </section>
+
+                    <!-- Empty Placeholder -->
+                    <div id="editor-placeholder" class="workspace-placeholder">
+                        <i class="fas fa-vial placeholder-icon"></i>
+                        <p>请从左侧选择一个 AI 技能进行配置</p>
+                    </div>
+                </div>
+            </div>
+
             <div class="detail-view hidden" id="detail-view">
                 <!-- Detail Header -->
                 <header class="detail-header">
@@ -126,7 +187,6 @@
                     <button id="btn-split">并排对照</button>
                     <button id="btn-original">仅原文</button>
                     <button class="active" id="btn-translation">仅翻译</button>
-                    <!-- Move button here -->
                     <button id="btn-add-todo" class="btn-icon-text" title="添加到待办事项">
                         <i class="fas fa-plus-circle"></i> 设为待办
                     </button>
@@ -155,9 +215,111 @@
                     </ul>
                 </footer>
             </div>
+
+            <!-- New: Todo Workspace View (Integrated) -->
+            <div id="todo-workspace-view" class="hidden todo-workspace">
+                <header class="workspace-header">
+                    <div class="header-info">
+                        <h2 class="workspace-title">
+                            <i class="fas fa-tasks"></i> 待办中心
+                        </h2>
+                        <p class="workspace-subtitle">管理您的邮件行动项与个人任务。</p>
+                    </div>
+                </header>
+
+                <div class="workspace-body-grid todo-grid">
+                    <!-- Left Column: Task List -->
+                    <div class="todo-main-pane">
+                        <div class="search-bar workspace-search">
+                            <i class="fas fa-search"></i>
+                            <input type="text" id="task-search-integrated" placeholder="搜索任务标题或内容...">
+                        </div>
+                        
+                        <div id="task-list-integrated" class="task-list-container">
+                            <div class="loading">
+                                <i class="fas fa-spinner fa-spin"></i> 正在加载待办...
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right Column: Calendar & Stats -->
+                    <aside class="todo-sidebar-pane">
+                        <div class="calendar-card">
+                            <header class="calendar-header">
+                                <div id="calendar-month-year-integrated" class="month-label">2026年 4月</div>
+                                <div class="calendar-nav">
+                                    <button id="prev-month-integrated" class="nav-btn"><i class="fas fa-chevron-left"></i></button>
+                                    <button id="next-month-integrated" class="nav-btn"><i class="fas fa-chevron-right"></i></button>
+                                </div>
+                            </header>
+                            <div class="calendar-grid-container">
+                                <div class="weekdays-row">
+                                    <span class="weekday">日</span><span class="weekday">一</span><span class="weekday">二</span><span class="weekday">三</span><span class="weekday">四</span><span class="weekday">五</span><span class="weekday">六</span>
+                                </div>
+                                <div id="calendar-days-integrated" class="days-grid"></div>
+                            </div>
+                        </div>
+
+                        <div class="todo-legend-card">
+                            <div class="legend-label">图例说明</div>
+                            <div class="legend-items">
+                                <div class="legend-item"><span class="dot dot-high"></span> <span class="legend-text">高优先级</span></div>
+                                <div class="legend-item"><span class="dot dot-normal"></span> <span class="legend-text">普通任务</span></div>
+                                <div class="legend-item"><span class="dot dot-low"></span> <span class="legend-text">低优先级</span></div>
+                            </div>
+                        </div>
+                    </aside>
+                </div>
+            </div>
         </main>
     </div>
+
+    <!-- Todo Drawer (Embedded Sage Theme) -->
+    <!-- Removed since it's now integrated as todo-workspace-view -->
+
+    <!-- Edit Todo Modal -->
+    <div id="todo-modal" class="modal-overlay hidden" style="z-index: 1500;">
+        <div class="modal-content glass-card">
+            <header class="modal-header">
+                <h2><i class="fas fa-edit"></i> 编辑待办事项</h2>
+                <button class="close-modal" id="modal-close">&times;</button>
+            </header>
+            <div class="modal-body">
+                <input type="hidden" id="modal-todo-id">
+                <div class="input-group">
+                    <label>任务标题</label>
+                    <input type="text" id="modal-todo-title" placeholder="要做什么？">
+                </div>
+                <div class="input-row">
+                    <div class="input-group">
+                        <label>截止日期</label>
+                        <input type="date" id="modal-todo-date">
+                    </div>
+                    <div class="input-group">
+                        <label>优先级</label>
+                        <select id="modal-todo-priority">
+                            <option value="High">🔥 高优先级</option>
+                            <option value="Normal">⚡ 普通</option>
+                            <option value="Low">🌱 低优先级</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="input-group">
+                    <label>执行详情与完成条标准</label>
+                    <textarea id="modal-todo-details" rows="4"></textarea>
+                </div>
+            </div>
+            <footer class="modal-footer">
+                <button id="modal-cancel" class="btn-secondary">取消</button>
+                <button id="modal-confirm" class="btn-primary">确认保存</button>
+            </footer>
+        </div>
+    </div>
+
+    <!-- Reuse todo renderer inside drawer -->
+    <script src="/static/js/todo.js?v=1.8"></script>
+    <script src="/static/js/prompt_lab.js?v=2.5"></script>
     <script src="/static/js/common.js?v=1.0"></script>
-    <script src="/static/js/app.js?v=2.1"></script>
+    <script src="/static/js/app.js?v=2.5"></script>
 </body>
 </html>
