@@ -5,6 +5,7 @@ import time
 import webbrowser
 import getpass
 from pathlib import Path
+import requests
 
 from tools.utils import (
     BASE_DIR, LOGS_DIR, ENV_FILE, API_PID_FILE, SCHEDULER_PID_FILE, print_header, get_local_ip
@@ -133,6 +134,19 @@ def start_background_process(script_path, log_file, pid_file):
     
     return process.pid
 
+def wait_for_api_ready(url="http://localhost:8000/api/stats", timeout=20):
+    """等待 API 真正可用，避免浏览器打开过早导致首页首次请求失败。"""
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        try:
+            response = requests.get(url, timeout=1.5)
+            if response.ok:
+                return True
+        except requests.RequestException:
+            pass
+        time.sleep(0.5)
+    return False
+
 def main():
     check_dependencies()
     print_header("🚀 DeepMail AI 启动程序 (Cross-Platform)", "blue")
@@ -166,8 +180,14 @@ def main():
     print(f"✅ 调度器已启动 (PID: {sched_pid})")
 
     print("\n⚡ 首次同步已改为后台执行，网页会先打开，邮件与 AI 摘要将逐步出现。")
+    print("⏳ 正在等待 Dashboard API 就绪...")
+    api_ready = wait_for_api_ready()
+    if api_ready:
+        print("✅ Dashboard API 已就绪。")
+    else:
+        print("⚠️ API 启动较慢，先尝试打开网页；页面会自动重试加载邮件。")
+
     print(f"\n🌐 正在为您打开 Dashboard 界面...")
-    time.sleep(2)
     webbrowser.open("http://localhost:8000")
 
     print("-" * 40)

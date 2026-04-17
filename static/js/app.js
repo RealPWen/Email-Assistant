@@ -12,6 +12,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentFilter = 'all'; // 'all' or 'high'
     let searchQuery = '';
     let emptyStatePollTimer = null;
+    let fetchRetryTimer = null;
+    let fetchRetryCount = 0;
 
     // --- DOM Cache for Detail View ---
     const dom = {
@@ -34,25 +36,46 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Data Fetching ---
     async function fetchEmails() {
         try {
-            const response = await fetch('/api/emails?limit=500')
-            .then(res => res.json())
-            .then(data => {
-                currentEmails = data;
-                // --- 优化：保存数据到本地缓存 ---
-                localStorage.setItem('deepmail_emails_cache', JSON.stringify(data));
-                localStorage.setItem('deepmail_cache_time', Date.now());
-                
-                applyFilters();
-                updateStats(data);
-                toggleInitialPolling(data);
-            });
+            const response = await fetch('/api/emails?limit=500');
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+
+            const data = await response.json();
+            currentEmails = data;
+            fetchRetryCount = 0;
+            if (fetchRetryTimer) {
+                clearTimeout(fetchRetryTimer);
+                fetchRetryTimer = null;
+            }
+
+            // --- 优化：保存数据到本地缓存 ---
+            localStorage.setItem('deepmail_emails_cache', JSON.stringify(data));
+            localStorage.setItem('deepmail_cache_time', Date.now());
+            
+            applyFilters();
+            updateStats(data);
+            toggleInitialPolling(data);
         } catch (error) {
             console.error('Failed to fetch emails:', error);
-            // 如果拉取失败且没有本地缓存，才显示错误
-            if (currentEmails.length === 0) {
-                emailListElement.innerHTML = '<div class="error">无法连接到服务器</div>';
-            }
+            scheduleFetchRetry();
         }
+    }
+
+    function scheduleFetchRetry() {
+        if (fetchRetryTimer) return;
+
+        fetchRetryCount += 1;
+        const retryDelay = Math.min(1500 * fetchRetryCount, 5000);
+
+        if (currentEmails.length === 0) {
+            emailListElement.innerHTML = '<div class="loading">服务器启动中，正在重试加载邮件...</div>';
+        }
+
+        fetchRetryTimer = setTimeout(() => {
+            fetchRetryTimer = null;
+            fetchEmails();
+        }, retryDelay);
     }
 
     function toggleInitialPolling(emails) {
