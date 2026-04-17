@@ -3,6 +3,7 @@ import os
 import sys
 import json
 import contextlib
+import re
 from email.header import decode_header
 from email.utils import parsedate_to_datetime
 from deep_translator import GoogleTranslator
@@ -26,6 +27,29 @@ if base_dir_str not in sys.path:
 elif sys.path[1:2] == [base_dir_str]: # Handle edge cases
     pass
 
+
+_EMOJI_PATTERN = re.compile(
+    "["
+    "\U0001F300-\U0001FAFF"
+    "\u2600-\u27BF"
+    "]",
+    flags=re.UNICODE,
+)
+
+
+def safe_print(*args, sep=" ", end="\n", file=None, flush=False):
+    """安全输出到控制台，避免 Windows GBK 控制台因 emoji 崩溃。"""
+    target = file or sys.stdout
+    message = sep.join(str(arg) for arg in args)
+    try:
+        print(message, end=end, file=target, flush=flush)
+    except UnicodeEncodeError:
+        sanitized = _EMOJI_PATTERN.sub("", message)
+        sanitized = sanitized.encode(target.encoding or "utf-8", errors="replace").decode(
+            target.encoding or "utf-8",
+            errors="replace",
+        )
+        print(sanitized, end=end, file=target, flush=flush)
 
 
 def get_local_ip():
@@ -117,7 +141,7 @@ def smart_translate(text, target='zh-CN', chunk_limit=4500):
 
         return "\n".join(translator.translate(c) for c in chunks if c.strip())
     except Exception as e:
-        print(f"⚠️ 翻译失败: {e}")
+        safe_print(f"⚠️ 翻译失败: {e}")
         return ""
 
 
@@ -148,9 +172,9 @@ def print_header(text, color="blue"):
     }
     c = colors.get(color, colors["nc"])
     nc = colors["nc"]
-    print(f"{c}======================================={nc}")
-    print(f"{c}    {text}    {nc}")
-    print(f"{c}======================================={nc}")
+    safe_print(f"{c}======================================={nc}")
+    safe_print(f"{c}    {text}    {nc}")
+    safe_print(f"{c}======================================={nc}")
 
 
 @contextlib.contextmanager

@@ -1,6 +1,7 @@
 import os
 import imaplib
 from dotenv import load_dotenv
+from tools.utils import safe_print
 
 from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -13,7 +14,7 @@ def get_mail_connection():
     try:
         mail.xatom('ID', '("name" "DeepMailAI" "version" "1.2.0")')
     except Exception as e:
-        print(f"⚠️ 发送 ID 握手信息失败: {e}")
+        safe_print(f"⚠️ 发送 ID 握手信息失败: {e}")
     mail.login(os.getenv("EMAIL_USER"), os.getenv("EMAIL_AUTH_CODE"))
     return mail
 
@@ -29,12 +30,12 @@ def _set_seen_flag(message_id, add=True):
             op = '+FLAGS' if add else '-FLAGS'
             mail.uid('STORE', uid, op, '(\\Seen)')
             action = "已读" if add else "未读"
-            print(f"✅ 已在服务器上将邮件标为{action} (UID: {uid.decode()})")
+            safe_print(f"✅ 已在服务器上将邮件标为{action} (UID: {uid.decode()})")
             return True
-        print(f"⚠️ 未在服务器上找到对应邮件 (Message-ID: {message_id})")
+        safe_print(f"⚠️ 未在服务器上找到对应邮件 (Message-ID: {message_id})")
         return False
     except Exception as e:
-        print(f"❌ 状态回写失败: {e}")
+        safe_print(f"❌ 状态回写失败: {e}")
         return False
     finally:
         mail.logout()

@@ -16,7 +16,7 @@ if str(BASE_DIR) not in sys.path:
 
 from tools.utils import (
     decode_str, normalize_date, generate_composite_key,
-    smart_translate, chunk_list, single_instance_lock,
+    smart_translate, chunk_list, single_instance_lock, safe_print,
 )
 from dotenv import load_dotenv
 
@@ -66,18 +66,18 @@ def enrich_email_content(email_data):
     """补全单封邮件的翻译与 AI 字段。"""
     subject = email_data.get("subject", "")
     body = email_data.get("body", "")
-    print(f"   📝 [并行] 翻译与 AI 分析: {subject[:20]}...")
+    safe_print(f"   📝 [并行] 翻译与 AI 分析: {subject[:20]}...")
 
     try:
         translation = smart_translate(body)
     except Exception as e:
-        print(f"   ⚠️ 翻译失败: {e}")
+        safe_print(f"   ⚠️ 翻译失败: {e}")
         translation = ""
 
     try:
         ai_result = EmailSummarySkill().analyze_email(body)
     except Exception as e:
-        print(f"   ⚠️ AI 分析失败: {e}")
+        safe_print(f"   ⚠️ AI 分析失败: {e}")
         ai_result = {}
 
     email_data["body_translation"] = translation
@@ -133,7 +133,7 @@ def sync_emails(max_scan=500, batch_size=50, progress_callback=None):
         info = {"status": status, "message": message, "progress": progress, "details": details or {}}
         if progress_callback:
             progress_callback(info)
-        print(f"[{status}] {message}")
+        safe_print(f"[{status}] {message}")
 
     with single_instance_lock() as lock_acquired:
         if not lock_acquired:
@@ -147,17 +147,17 @@ def sync_emails(max_scan=500, batch_size=50, progress_callback=None):
         imap_server = "imap.163.com"
 
         if not email_user or not email_pass:
-            print("❌ 错误: 请确保 .env 文件中配置了 EMAIL_USER 和 EMAIL_AUTH_CODE")
+            safe_print("❌ 错误: 请确保 .env 文件中配置了 EMAIL_USER 和 EMAIL_AUTH_CODE")
             return
 
         try:
-            print(f"📡 正在连接 {imap_server}...")
+            safe_print(f"📡 正在连接 {imap_server}...")
             mail = imaplib.IMAP4_SSL(imap_server)
             mail.login(email_user, email_pass)
             try:
                 mail.xatom('ID', '("name" "fetch_script" "version" "1.1.0")')
             except Exception as e:
-                print(f"⚠️ IMAP ID 指令不受支持或失败: {e}")
+                safe_print(f"⚠️ IMAP ID 指令不受支持或失败: {e}")
 
             mail.select("INBOX")
             status, messages = mail.search(None, "ALL")
@@ -310,7 +310,7 @@ def sync_emails(max_scan=500, batch_size=50, progress_callback=None):
             )
 
         except Exception as e:
-            print(f"❌ 发生错误: {e}")
+            safe_print(f"❌ 发生错误: {e}")
             import traceback; traceback.print_exc()
 
 

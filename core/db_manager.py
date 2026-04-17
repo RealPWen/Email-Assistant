@@ -1,5 +1,6 @@
 import sqlite3
 import os
+from tools.utils import safe_print
 
 
 class DBManager:
@@ -54,7 +55,7 @@ class DBManager:
                 ("reason", "TEXT"),
             ]:
                 if col_name not in existing:
-                    print(f"🔧 正在升级数据库: 添加列 {col_name}...")
+                    safe_print(f"🔧 正在升级数据库: 添加列 {col_name}...")
                     cursor.execute(f"ALTER TABLE emails ADD COLUMN {col_name} {col_type}")
 
             cursor.execute('''
@@ -92,7 +93,7 @@ class DBManager:
                             (skill_name, default_prompt, default_prompt)
                         )
             except Exception as e:
-                print(f"⚠️ 初始化默认 Prompt 失败: {e}")
+                safe_print(f"⚠️ 初始化默认 Prompt 失败: {e}")
 
             conn.commit()
 

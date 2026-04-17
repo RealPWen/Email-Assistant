@@ -1,5 +1,6 @@
 from datetime import datetime
 from core.base_skill import BaseSkill
+from tools.utils import safe_print
 
 
 class TodoSkill(BaseSkill):
@@ -22,7 +23,7 @@ class TodoSkill(BaseSkill):
             result = self.call_api(system_prompt, f"邮件内容如下：\n{cleaned}")
             return result if result else {"error": "API Key not configured"}
         except Exception as e:
-            print(f"❌ Todo 提取失败: {e}")
+            safe_print(f"❌ Todo 提取失败: {e}")
             return {
                 "title": "提取失败",
                 "due_date": datetime.now().strftime("%Y-%m-%d"),

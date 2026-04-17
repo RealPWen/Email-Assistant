@@ -1,4 +1,5 @@
 from core.base_skill import BaseSkill
+from tools.utils import safe_print
 
 # AI 分析失败时的回退结果
 _FALLBACK = {"summary": "", "action_items": [], "importance": "低", "category": "其他", "reason": ""}
@@ -16,11 +17,11 @@ class EmailSummarySkill(BaseSkill):
         user_prompt = f"{custom_instruction}\n\n待分析邮件正文：\n{cleaned}"
 
         try:
-            print("🌐 正在调用 DeepSeek 官方 API...")
+            safe_print("🌐 正在调用 DeepSeek 官方 API...")
             result = self.call_api(system_prompt, user_prompt)
             return result if result else {**_FALLBACK, "summary": "错误: 未配置 DEEPSEEK_API_KEY", "reason": "缺少 API 密钥"}
         except Exception as e:
-            print(f"❌ 官方 API 调用失败: {e}")
+            safe_print(f"❌ 官方 API 调用失败: {e}")
             return {**_FALLBACK, "summary": f"分析失败: {e}", "reason": "API 接口异常"}
 
     def summarize(self, raw_content, custom_instruction=""):

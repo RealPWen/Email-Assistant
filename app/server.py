@@ -16,6 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from core.db_manager import DBManager
 from core.todo_skill import TodoSkill
 from tools.fetch_emails import sync_emails
+from tools.utils import safe_print
 import json
 import asyncio
 from queue import Queue
@@ -62,10 +63,10 @@ def launch_initial_sync():
 
     def run_sync():
         try:
-            print("🚀 服务启动后触发后台首次同步...")
+            safe_print("🚀 服务启动后触发后台首次同步...")
             sync_emails(max_scan=50, batch_size=10)
         except Exception as e:
-            print(f"❌ 启动后首次同步失败: {e}")
+            safe_print(f"❌ 启动后首次同步失败: {e}")
 
     thread = Thread(target=run_sync, daemon=True)
     thread.start()
@@ -200,9 +201,9 @@ def process_smart_todo(email_id: int, todo_id: int):
             "status": 0
         }
         db.update_todo(todo_id, todo_data)
-        print(f"✅ 邮件 {email_id} 的智能待办已更新 (后台任务)")
+        safe_print(f"✅ 邮件 {email_id} 的智能待办已更新 (后台任务)")
     except Exception as e:
-        print(f"❌ 智能提取后台任务失败: {e}")
+        safe_print(f"❌ 智能提取后台任务失败: {e}")
         # 失败状态，将任务置为人工处理
         db.update_todo(todo_id, {"title": f"⚠ AI 提取失败: {email.get('subject')}", "status": 0})
 
@@ -277,7 +278,7 @@ def sync_now():
             "total_emails": count
         }
     except Exception as e:
-        print(f"Sync error: {e}")
+        safe_print(f"Sync error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 # --- Prompt Lab Endpoints ---
