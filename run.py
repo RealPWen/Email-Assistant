@@ -90,15 +90,6 @@ def run_self_check():
         sys.exit(1)
     print("✅ 系统自检通过，准备启动服务...")
 
-def run_initial_sync():
-    db_file = BASE_DIR / "data" / "emails.db"
-    if not db_file.exists():
-        print("\n📦 正在初始化数据库并进行首次同步 (请稍候)...")
-    else:
-        print("\n🔄 正在同步最新邮件...")
-    
-    subprocess.run([sys.executable, "tools/fetch_emails.py", "--max-scan", "50"])
-
 def start_background_process(script_path, log_file, pid_file):
     """跨平台启动后台进程"""
     if not LOGS_DIR.exists():
@@ -163,9 +154,7 @@ def main():
             else:
                 print("❌ 程序退出。请手动检查 .env 文件。")
                 sys.exit(1)
-    
-    run_initial_sync()
-    
+
     # 启动后端
     print("\n📂 正在启动 Dashboard 后端...")
     api_pid = start_background_process("app/server.py", LOGS_DIR / "api.log", API_PID_FILE)
@@ -176,6 +165,7 @@ def main():
     sched_pid = start_background_process("tools/scheduler.py", LOGS_DIR / "scheduler.log", SCHEDULER_PID_FILE)
     print(f"✅ 调度器已启动 (PID: {sched_pid})")
 
+    print("\n⚡ 首次同步已改为后台执行，网页会先打开，邮件与 AI 摘要将逐步出现。")
     print(f"\n🌐 正在为您打开 Dashboard 界面...")
     time.sleep(2)
     webbrowser.open("http://localhost:8000")

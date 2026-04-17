@@ -11,6 +11,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let isSyncingScroll = false;
     let currentFilter = 'all'; // 'all' or 'high'
     let searchQuery = '';
+    let emptyStatePollTimer = null;
 
     // --- DOM Cache for Detail View ---
     const dom = {
@@ -43,6 +44,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 applyFilters();
                 updateStats(data);
+                toggleInitialPolling(data);
             });
         } catch (error) {
             console.error('Failed to fetch emails:', error);
@@ -50,6 +52,24 @@ document.addEventListener('DOMContentLoaded', () => {
             if (currentEmails.length === 0) {
                 emailListElement.innerHTML = '<div class="error">无法连接到服务器</div>';
             }
+        }
+    }
+
+    function toggleInitialPolling(emails) {
+        const hasEmails = Array.isArray(emails) && emails.length > 0;
+        if (hasEmails) {
+            if (emptyStatePollTimer) {
+                clearInterval(emptyStatePollTimer);
+                emptyStatePollTimer = null;
+            }
+            return;
+        }
+
+        if (!emptyStatePollTimer) {
+            emailListElement.innerHTML = '<div class="loading">首次启动中，邮件正在后台同步...</div>';
+            emptyStatePollTimer = setInterval(() => {
+                fetchEmails();
+            }, 3000);
         }
     }
 

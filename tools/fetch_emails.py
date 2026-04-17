@@ -141,8 +141,10 @@ def sync_emails(max_scan=500, batch_size=50, progress_callback=None):
 
         report("fetching", f"正在抓取新邮件内容 (共 {total_to_sync} 封)...", 25)
 
-        # 第二阶段：批量 Fetch + 并行 AI 分析
+        # 第二阶段：批量抓取；先落库，再并行 AI 回填，缩短首屏等待时间
         new_count = 0
+        analyzed_count = 0
+        ai_futures = []
 
         def process_single_email(email_data):
             subject = email_data["subject"]
@@ -163,65 +165,92 @@ def sync_emails(max_scan=500, batch_size=50, progress_callback=None):
             email_data["category"] = ai_result.get("category", "其他")
             return email_data
 
-        for idx_batch, batch in enumerate(chunk_list(ids_to_fetch_full, batch_size), 1):
-            batch_uids = ",".join([item[0] for item in batch])
-            res, msg_data_list = mail.fetch(batch_uids, "(RFC822)")
+        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+            for idx_batch, batch in enumerate(chunk_list(ids_to_fetch_full, batch_size), 1):
+                batch_uids = ",".join([item[0] for item in batch])
+                res, msg_data_list = mail.fetch(batch_uids, "(RFC822)")
 
-            parsed_emails = []
-            for i in range(0, len(msg_data_list), 2):
-                if not isinstance(msg_data_list[i], tuple):
-                    continue
-                msg = email.message_from_bytes(msg_data_list[i][1])
-                subject = decode_str(msg.get("Subject"))
-                sender = decode_str(msg.get("From"))
-                date_str = msg.get("Date")
+                parsed_emails = []
+                for i in range(0, len(msg_data_list), 2):
+                    if not isinstance(msg_data_list[i], tuple):
+                        continue
+                    msg = email.message_from_bytes(msg_data_list[i][1])
+                    subject = decode_str(msg.get("Subject"))
+                    sender = decode_str(msg.get("From"))
+                    date_str = msg.get("Date")
 
-                try:
-                    m_id_match = re.search(r'^(\d+)', msg_data_list[i][0].decode())
-                    current_m_id = m_id_match.group(1) if m_id_match else None
-                except Exception:
-                    current_m_id = None
+                    try:
+                        m_id_match = re.search(r'^(\d+)', msg_data_list[i][0].decode())
+                        current_m_id = m_id_match.group(1) if m_id_match else None
+                    except Exception:
+                        current_m_id = None
 
-                # 匹配元数据
-                target_sync_id, target_is_read = None, 0
-                for b_item in batch:
-                    if b_item[0] == current_m_id:
-                        target_sync_id, target_is_read = b_item[1], b_item[2]
-                        break
-                if not target_sync_id:
-                    computed = generate_composite_key(msg.get("Subject"), date_str)
+                    # 匹配元数据
+                    target_sync_id, target_is_read = None, 0
                     for b_item in batch:
-                        if b_item[1] == computed:
+                        if b_item[0] == current_m_id:
                             target_sync_id, target_is_read = b_item[1], b_item[2]
                             break
                     if not target_sync_id:
-                        target_sync_id = computed
+                        computed = generate_composite_key(msg.get("Subject"), date_str)
+                        for b_item in batch:
+                            if b_item[1] == computed:
+                                target_sync_id, target_is_read = b_item[1], b_item[2]
+                                break
+                        if not target_sync_id:
+                            target_sync_id = computed
 
-                parsed_emails.append({
-                    "message_id": target_sync_id,
-                    "subject": subject, "sender": sender, "date_str": date_str,
-                    "normalized_date": normalize_date(date_str),
-                    "body": get_text_from_msg(msg), "folder": "INBOX",
-                    "is_read": target_is_read,
-                    "attachments_metadata": json.dumps(get_attachments_metadata(msg), ensure_ascii=False),
-                    "body_translation": "", "summary": "", "action_items": "[]", "importance": "低",
-                })
+                    parsed_emails.append({
+                        "message_id": target_sync_id,
+                        "subject": subject, "sender": sender, "date_str": date_str,
+                        "normalized_date": normalize_date(date_str),
+                        "body": get_text_from_msg(msg), "folder": "INBOX",
+                        "is_read": target_is_read,
+                        "attachments_metadata": json.dumps(get_attachments_metadata(msg), ensure_ascii=False),
+                        "body_translation": "",
+                        "summary": "AI 正在分析中...",
+                        "action_items": "[]",
+                        "importance": "处理中",
+                        "category": "待分析",
+                    })
 
-            with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
-                processed = list(executor.map(process_single_email, parsed_emails))
+                for ed in parsed_emails:
+                    if db.save_email(ed):
+                        new_count += 1
+                        ai_futures.append(executor.submit(process_single_email, ed))
 
-            for ed in processed:
-                if db.save_email(ed):
-                    new_count += 1
+                done_count = min(idx_batch * batch_size, total_to_sync)
+                progress = 25 + int((done_count / total_to_sync) * 35)
+                last_subj = parsed_emails[-1]["subject"] if parsed_emails else "未知"
+                report(
+                    "fetching",
+                    f"邮件正文已入库 ({done_count}/{total_to_sync})，AI 正在后台分析...",
+                    progress,
+                    {"current": done_count, "total": total_to_sync, "last_subject": last_subj}
+                )
 
-            done_count = min(idx_batch * batch_size, total_to_sync)
-            progress = 25 + int((done_count / total_to_sync) * 70)
-            last_subj = processed[-1]["subject"] if processed else "未知"
-            report("analyzing", f"AI 正在分析邮件批量 ({done_count}/{total_to_sync})...", progress,
-                   {"current": done_count, "total": total_to_sync, "last_subject": last_subj})
+            for future in concurrent.futures.as_completed(ai_futures):
+                processed = future.result()
+                db.update_email_metadata(
+                    processed["message_id"],
+                    ai_data={
+                        "summary": processed["summary"],
+                        "action_items": processed["action_items"],
+                        "importance": processed["importance"],
+                        "category": processed["category"],
+                    }
+                )
+                analyzed_count += 1
+                progress = 60 + int((analyzed_count / total_to_sync) * 40)
+                report(
+                    "analyzing",
+                    f"AI 正在补全摘要与分类 ({analyzed_count}/{total_to_sync})...",
+                    progress,
+                    {"current": analyzed_count, "total": total_to_sync}
+                )
 
         mail.close(); mail.logout()
-        report("done", f"同步完成！新增 {new_count} 封邮件。", 100, {"new_count": new_count})
+        report("done", f"同步完成！新增 {new_count} 封邮件，AI 已完成 {analyzed_count} 封分析。", 100, {"new_count": new_count})
 
     except Exception as e:
         print(f"❌ 发生错误: {e}")
