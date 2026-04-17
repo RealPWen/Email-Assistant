@@ -19,9 +19,11 @@ from tools.fetch_emails import sync_emails
 import json
 import asyncio
 from queue import Queue
-from threading import Thread
+from threading import Thread, Lock
 
 app = FastAPI(title="DeepMail AI API")
+startup_sync_lock = Lock()
+startup_sync_started = False
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
@@ -49,6 +51,28 @@ def serve_html(filename):
     path = os.path.join(BASE_DIR, "static", filename)
     with open(path, "r", encoding="utf-8") as f:
         return f.read()
+
+def launch_initial_sync():
+    """服务启动后立即在后台做一次首轮同步，避免首次空库时页面一直无数据。"""
+    global startup_sync_started
+    with startup_sync_lock:
+        if startup_sync_started:
+            return
+        startup_sync_started = True
+
+    def run_sync():
+        try:
+            print("🚀 服务启动后触发后台首次同步...")
+            sync_emails(max_scan=50, batch_size=10)
+        except Exception as e:
+            print(f"❌ 启动后首次同步失败: {e}")
+
+    thread = Thread(target=run_sync, daemon=True)
+    thread.start()
+
+@app.on_event("startup")
+async def on_startup():
+    launch_initial_sync()
 
 @app.get("/", response_class=HTMLResponse)
 async def read_index():
