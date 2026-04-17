@@ -4,11 +4,16 @@ import sys
 import json
 import contextlib
 import re
+import requests
 from email.header import decode_header
 from email.utils import parsedate_to_datetime
-from deep_translator import GoogleTranslator
 from pathlib import Path
 import socket
+
+try:
+    from deep_translator import GoogleTranslator
+except Exception:
+    GoogleTranslator = None
 
 # --- Constants & Paths ---
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -113,36 +118,118 @@ def generate_composite_key(subject, date_str):
     return f"{norm_date}_{norm_subject}"
 
 
+def _chunk_text(text, chunk_limit):
+    """长文本按段落分块，尽量避免截断语义。"""
+    paragraphs = text.split('\n')
+    chunks, current = [], ""
+    for p in paragraphs:
+        if len(p) > chunk_limit:
+            if current:
+                chunks.append(current.strip())
+                current = ""
+            for i in range(0, len(p), chunk_limit):
+                chunks.append(p[i:i + chunk_limit])
+            continue
+        if len(current) + len(p) + 1 <= chunk_limit:
+            current += p + "\n"
+        else:
+            chunks.append(current.strip())
+            current = p + "\n"
+    if current:
+        chunks.append(current.strip())
+    return [chunk for chunk in chunks if chunk.strip()]
+
+
+def _translate_with_deepseek(text, target='zh-CN', chunk_limit=3500):
+    """使用 DeepSeek 做翻译，适合中国大陆服务器环境。"""
+    api_key = os.getenv("DEEPSEEK_API_KEY")
+    if not api_key:
+        raise RuntimeError("缺少 DEEPSEEK_API_KEY，无法使用 DeepSeek 翻译")
+
+    api_base_url = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com").rstrip("/")
+    model = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
+    target_language = {
+        "zh-CN": "简体中文",
+        "zh-TW": "繁体中文",
+        "en": "English",
+        "ja": "日本語",
+    }.get(target, target)
+
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+
+    def translate_chunk(chunk):
+        payload = {
+            "model": model,
+            "messages": [
+                {
+                    "role": "system",
+                    "content": (
+                        "你是专业邮件翻译助手。请准确翻译用户提供的邮件正文，"
+                        f"输出为{target_language}。"
+                        "只返回译文，不要加解释、标题、引号或备注。"
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": chunk,
+                },
+            ],
+            "stream": False,
+        }
+        response = requests.post(
+            f"{api_base_url}/chat/completions",
+            json=payload,
+            headers=headers,
+            timeout=90,
+        )
+        response.raise_for_status()
+        data = response.json()
+        return data["choices"][0]["message"]["content"].strip()
+
+    if len(text) <= chunk_limit:
+        return translate_chunk(text)
+    return "\n".join(translate_chunk(chunk) for chunk in _chunk_text(text, chunk_limit))
+
+
+def _translate_with_google(text, target='zh-CN', chunk_limit=4500):
+    """保留 Google 作为可选回退方案。"""
+    if GoogleTranslator is None:
+        raise RuntimeError("deep-translator 未安装，无法使用 Google 翻译")
+
+    translator = GoogleTranslator(source='auto', target=target)
+    if len(text) <= chunk_limit:
+        return translator.translate(text)
+    return "\n".join(translator.translate(chunk) for chunk in _chunk_text(text, chunk_limit))
+
+
 def smart_translate(text, target='zh-CN', chunk_limit=4500):
-    """智能翻译：支持长文本分段翻译，按段落截断。"""
+    """智能翻译，默认优先走 DeepSeek，避免中国大陆环境下 Google 不可用。"""
     if not text or not text.strip():
         return ""
-    try:
-        translator = GoogleTranslator(source='auto', target=target)
-        if len(text) <= chunk_limit:
-            return translator.translate(text)
 
-        # 长文本按段落切割
-        paragraphs = text.split('\n')
-        chunks, current = [], ""
-        for p in paragraphs:
-            if len(p) > chunk_limit:
-                if current:
-                    chunks.append(current.strip()); current = ""
-                for i in range(0, len(p), chunk_limit):
-                    chunks.append(p[i:i + chunk_limit])
-                continue
-            if len(current) + len(p) + 1 <= chunk_limit:
-                current += p + "\n"
-            else:
-                chunks.append(current.strip()); current = p + "\n"
-        if current:
-            chunks.append(current.strip())
+    provider = os.getenv("TRANSLATION_PROVIDER", "deepseek").strip().lower()
+    providers = {
+        "deepseek": ("deepseek",),
+        "google": ("google",),
+        "auto": ("deepseek", "google"),
+    }.get(provider, ("deepseek", "google"))
 
-        return "\n".join(translator.translate(c) for c in chunks if c.strip())
-    except Exception as e:
-        safe_print(f"⚠️ 翻译失败: {e}")
-        return ""
+    last_error = None
+    for current in providers:
+        try:
+            if current == "deepseek":
+                return _translate_with_deepseek(text, target=target, chunk_limit=min(chunk_limit, 3500))
+            if current == "google":
+                return _translate_with_google(text, target=target, chunk_limit=chunk_limit)
+        except Exception as e:
+            last_error = e
+            safe_print(f"⚠️ {current} 翻译失败: {e}")
+
+    safe_print(f"⚠️ 翻译失败: {last_error}")
+    return ""
 
 
 def format_ai_result(ai_res):
