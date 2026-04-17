@@ -125,6 +125,8 @@ def start_background_process(script_path, log_file, pid_file):
     # 注入 PYTHONPATH
     env = os.environ.copy()
     env["PYTHONPATH"] = str(BASE_DIR)
+    env["PYTHONIOENCODING"] = "utf-8"
+    env["PYTHONUTF8"] = "1"
     popen_kwargs["env"] = env
 
     process = subprocess.Popen([sys.executable, "-u", full_script_path], **popen_kwargs)

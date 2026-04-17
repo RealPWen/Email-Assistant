@@ -42,6 +42,18 @@ _EMOJI_PATTERN = re.compile(
 )
 
 
+def configure_output_streams():
+    """尽量把标准输出切到 UTF-8，减少 Windows 上日志乱码。"""
+    for stream_name in ("stdout", "stderr"):
+        stream = getattr(sys, stream_name, None)
+        if stream is None:
+            continue
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
+
 def safe_print(*args, sep=" ", end="\n", file=None, flush=False):
     """安全输出到控制台，避免 Windows GBK 控制台因 emoji 崩溃。"""
     target = file or sys.stdout

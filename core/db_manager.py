@@ -2,6 +2,8 @@ import sqlite3
 import os
 from tools.utils import safe_print
 
+_UNSET = object()
+
 
 class DBManager:
     def __init__(self, db_path=None):
@@ -149,19 +151,20 @@ class DBManager:
     def get_untranslated_emails(self):
         return self._execute('''
             SELECT message_id, body, date_str, normalized_date, summary, category FROM emails
-            WHERE (body_translation IS NULL OR body_translation = '')
+            WHERE (body_translation IS NULL OR body_translation = '' OR body_translation = '翻译生成中...')
                OR (normalized_date IS NULL OR normalized_date = '')
-               OR (summary IS NULL OR summary = '')
-               OR (category IS NULL OR category = '其他')
+               OR (summary IS NULL OR summary = '' OR summary = 'AI 正在分析中...')
+               OR (category IS NULL OR category = '其他' OR category = '待分析')
+               OR (importance IS NULL OR importance = '' OR importance = '处理中')
         ''', fetch='all')
 
-    def update_email_metadata(self, message_id, normalized_date=None, translation=None, ai_data=None):
+    def update_email_metadata(self, message_id, normalized_date=_UNSET, translation=_UNSET, ai_data=_UNSET):
         updates, params = [], []
-        if normalized_date:
+        if normalized_date is not _UNSET:
             updates.append("normalized_date = ?"); params.append(normalized_date)
-        if translation:
+        if translation is not _UNSET:
             updates.append("body_translation = ?"); params.append(translation)
-        if ai_data:
+        if ai_data is not _UNSET and ai_data is not None:
             for key in ('summary', 'action_items', 'importance'):
                 updates.append(f"{key} = ?"); params.append(ai_data.get(key))
             updates.append("category = ?"); params.append(ai_data.get('category', '其他'))

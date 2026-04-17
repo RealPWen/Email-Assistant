@@ -73,12 +73,21 @@ def enrich_email_content(email_data):
     except Exception as e:
         safe_print(f"   ⚠️ 翻译失败: {e}")
         translation = ""
+    if not translation:
+        translation = "翻译失败或服务暂不可用"
 
     try:
         ai_result = EmailSummarySkill().analyze_email(body)
     except Exception as e:
         safe_print(f"   ⚠️ AI 分析失败: {e}")
         ai_result = {}
+    if not ai_result:
+        ai_result = {
+            "summary": "分析失败或服务暂不可用",
+            "action_items": [],
+            "importance": "低",
+            "category": "其他",
+        }
 
     email_data["body_translation"] = translation
     email_data["summary"] = ai_result.get("summary", "")
