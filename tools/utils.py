@@ -2,6 +2,7 @@
 import os
 import sys
 import json
+import contextlib
 from email.header import decode_header
 from email.utils import parsedate_to_datetime
 from deep_translator import GoogleTranslator
@@ -15,6 +16,7 @@ LOGS_DIR = BASE_DIR / "logs"
 API_PID_FILE = LOGS_DIR / ".api.pid"
 SCHEDULER_PID_FILE = LOGS_DIR / ".scheduler.pid"
 ENV_FILE = BASE_DIR / ".env"
+SYNC_LOCK_FILE = DATA_DIR / ".sync.lock"
 
 # 统一处理 sys.path，确保项目根目录在搜索路径的最前面
 # 这对于 Windows 上的多模块导入至关重要
@@ -149,3 +151,47 @@ def print_header(text, color="blue"):
     print(f"{c}======================================={nc}")
     print(f"{c}    {text}    {nc}")
     print(f"{c}======================================={nc}")
+
+
+@contextlib.contextmanager
+def single_instance_lock(lock_path=SYNC_LOCK_FILE):
+    """跨进程互斥锁，避免多个同步任务同时跑导致库里长期堆满占位状态。"""
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    lock_fh = open(lock_path, "w", encoding="utf-8")
+    acquired = False
+    try:
+        if os.name == "nt":
+            import msvcrt
+            try:
+                msvcrt.locking(lock_fh.fileno(), msvcrt.LK_NBLCK, 1)
+                acquired = True
+            except OSError:
+                acquired = False
+        else:
+            import fcntl
+            try:
+                fcntl.flock(lock_fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                acquired = True
+            except OSError:
+                acquired = False
+
+        if acquired:
+            lock_fh.seek(0)
+            lock_fh.truncate()
+            lock_fh.write(str(os.getpid()))
+            lock_fh.flush()
+
+        yield acquired
+    finally:
+        if acquired:
+            try:
+                if os.name == "nt":
+                    import msvcrt
+                    lock_fh.seek(0)
+                    msvcrt.locking(lock_fh.fileno(), msvcrt.LK_UNLCK, 1)
+                else:
+                    import fcntl
+                    fcntl.flock(lock_fh.fileno(), fcntl.LOCK_UN)
+            except OSError:
+                pass
+        lock_fh.close()
